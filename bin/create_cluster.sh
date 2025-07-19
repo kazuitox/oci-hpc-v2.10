@@ -90,7 +90,7 @@ do
 
   echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/create_$2_${date}.log 2>&1
   terraform init >> $logs_folder/create_$2_${date}.log 2>&1
-  terraform apply -auto-approve -parallelism $1 >> $logs_folder/create_$2_${date}.log 2>&1
+  terraform apply -auto-approve -parallelism 1 >> $logs_folder/create_$2_${date}.log 2>&1
   status=$?
   end=`date -u +%s`
   end_timestamp=`date -u +'%F %T'`
