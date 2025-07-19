@@ -7,6 +7,14 @@
     job: "/opt/oci-hpc/autoscaling/crontab/autoscale_slurm.sh >> /opt/oci-hpc/logs/crontab_slurm_`date '+\\%Y\\%m\\%d'`.log 2>&1"
   when: autoscaling | bool
 
+- name: Creates a cron file under /etc/cron.d
+  cron:
+    name: slurm autoscaling disable resize
+    minute: "*"
+    user: '{{ ansible_user }}'
+    job: "/opt/oci-hpc/autoscaling/crontab/autoscale_slurm_disable-resize.sh >> /opt/oci-hpc/logs/crontab_slurm_`date '+\\%Y\\%m\\%d'`.log 2>&1"
+  when: autoscaling | bool
+
 - name: Create a slurm monitoring cron file under /etc/cron.d
   cron:
     name: slurm monitoring
@@ -29,6 +37,14 @@
     minute: "#*"
     user: '{{ ansible_user }}'
     job: "#/opt/oci-hpc/autoscaling/crontab/autoscale_slurm.sh >> /opt/oci-hpc/logs/crontab_slurm_`date '+\\%Y\\%m\\%d'`.log 2>&1"
+  when: not autoscaling | bool
+
+- name: Creates a commented cron file under /etc/cron.d
+  cron:
+    name: slurm autoscaling disable resize
+    minute: "#*"
+    user: '{{ ansible_user }}'
+    job: "#/opt/oci-hpc/autoscaling/crontab/autoscale_slurm_disable-resize.sh >> /opt/oci-hpc/logs/crontab_slurm_`date '+\\%Y\\%m\\%d'`.log 2>&1"
   when: not autoscaling | bool
 
 
