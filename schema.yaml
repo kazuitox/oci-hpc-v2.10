@@ -1647,7 +1647,7 @@ configuration\" "
   autoscaling:
     type: boolean
     title: "Scheduler based autoscaling"
-    default: false
+    default: true
     description: "Requires SLURM installation. Scheduler will launch new clusters based on job requirements"
     
   latency_check:
