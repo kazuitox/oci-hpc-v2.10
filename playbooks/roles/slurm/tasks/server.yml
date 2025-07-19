@@ -155,8 +155,10 @@
 - name: add alias for node status
   lineinfile:
     path: '/home/{{ ansible_user }}/.bashrc'
-    line: '[ -d /opt/oci-hpc/logs ] && alias status="tail $(ls -rt1 /opt/oci-hpc/logs/crontab_slurm_* | tail -1)"'
+    line: >-
+      [ -d /opt/oci-hpc/logs ] && alias status="tac $(ls -rt1 /opt/oci-hpc/logs/crontab_slurm_* | tail -1) | sed '/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}/q' | tac"
     state: present
+    insertafter: EOF
 
 - name: add alias for max nodes distributed evenly
   lineinfile:
