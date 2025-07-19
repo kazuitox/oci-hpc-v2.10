@@ -1,0 +1,160 @@
+---
+- name: create munge group
+  become: true
+  group:
+    name: munge
+    gid: "{{ munge_gid }}"
+    state: present
+    system: yes
+- name: create munge user
+  become: true
+  user:
+    name: munge
+    comment: "munge"
+    uid: "{{ munge_uid }}"
+    group: "{{ munge_gid }}"
+    shell: /sbin/nologin
+    home: /var/lib/munge
+    state: present
+- name: create slurm group
+  become: true
+  group:
+    name: slurm
+    gid: "{{ slurm_gid }}"
+    state: present
+    system: yes
+- name: create slurm user
+  become: true
+  user:
+    name: slurm
+    comment: "Slurm user"
+    uid: "{{ slurm_uid }}"
+    group: "{{ slurm_gid }}"
+    shell: /bin/bash
+    home: /var/lib/slurm
+    state: present
+
+
+- name: Create Slurm RPM directory
+  become: true
+  file:
+    path: "{{ download_path }}/slurm_rpms"
+    state: directory
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+  when: download_path == '/tmp'
+
+- name: Create Slurm RPM directory
+  become: true
+  file:
+    path: "{{ download_path }}/slurm_rpms"
+    state: directory
+    owner: '{{ ansible_user }}'
+    group: '{{ ansible_user }}'
+  delegate_to: 127.0.0.1
+  run_once: true
+  when: download_path != '/tmp'
+
+- name: Add Environment variable file for SLurm
+  become: true
+  template:
+    src: 'systemd/slurm_env.j2'
+    dest: '/etc/default/slurm'
+    backup: "yes"
+  when: ansible_os_family == 'Debian'
+
+- name: Create {{ slurm_spool_path }}
+  become: true
+  file:
+    name: "{{ slurm_spool_path }}"
+    state: directory
+    owner: 'slurm'
+    group: 'slurm'
+    mode: '0755'
+
+- name: Create /run/slurm/
+  become: true
+  file:
+    name: /run/slurm/
+    state: directory
+    owner: 'slurm'
+    group: 'slurm'
+    mode: '0755'
+
+- name: Create munge dir
+  become: true
+  file:
+    name: '{{ munge_conf_path }}'
+    state: directory
+    owner: munge
+    group: munge
+    mode: 0700
+    
+- name: Ensure {{ slurm_log_path }} exists
+  become: true
+  file:
+    path: '{{ slurm_log_path }}'
+    owner: slurm
+    group: slurm
+    mode: 0750
+    state: directory
+
+- name: Ensure {{ slurm_conf_path }} exists
+  become: true
+  file:
+    path: '{{ slurm_conf_path }}'
+    state: directory
+
+- name: Ensure {{ munge_run_path }} has the correct permissions
+  become: true
+  file:
+    path: '{{ munge_run_path }}'
+    owner: munge
+    group: munge
+    mode: 0755
+    state: directory
+
+- name: Ensure {{ munge_log_path }} has the correct permissions
+  become: true
+  file:
+    path: '{{ munge_log_path }}'
+    owner: munge
+    group: munge
+    mode: 0755
+    state: directory
+
+- name: Ensure {{ slurm_conf_path }} has the correct permissions
+  become: true
+  file:
+    path: '{{ slurm_conf_path }}'
+    owner: slurm
+    group: slurm
+    mode: 0755
+    state: directory
+
+- name: Include pyxis prolog files
+  include_tasks: common_pyxis.yml
+  when: pyxis|bool
+
+- name: Include pyxis prolog files
+  include_tasks: common_pmix.yml
+  when: ansible_os_family == 'RedHat'
+
+- name: Ensure prolog directory exists
+  become: true
+  file:
+    path: "{{ slurm_conf_path }}/prolog.d"
+    state: directory
+    owner: root
+    group: root
+  when: healthchecks|bool
+
+- name: copy healthchecks
+  become: true
+  copy: 
+    src: healthchecks.sh
+    dest: "{{ slurm_conf_path }}/prolog.d/healthchecks.sh"
+    owner: root
+    group: root
+    mode: '0755'
+  when: healthchecks|bool
