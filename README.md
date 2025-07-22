@@ -3,9 +3,6 @@
   🇯🇵 <a href="README.ja.md">日本語はこちら</a>
 </p>
 
-# Project Title
-<English content continues…>
-
 # Stack to create an HPC cluster. 
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/kazuitox/oci-hpc-v2.10/archive/refs/heads/master.zip)
