@@ -734,6 +734,9 @@ variables:
             - "VM.Standard.E5.Flex"
           - eq:
             - ${controller_shape}
+            - "VM.Standard.E6.Flex"
+          - eq:
+            - ${controller_shape}
             - "VM.Optimized3.Flex"
           - eq: 
             - ${controller_shape}
@@ -784,6 +787,9 @@ variables:
             - "VM.Standard.E5.Flex"
           - eq: 
             - ${controller_shape}
+            - "VM.Standard.E6.Flex"
+          - eq: 
+            - ${controller_shape}
             - "VM.Standard.A1.Flex"
           - eq:
             - ${controller_shape}
@@ -811,6 +817,9 @@ variables:
             - eq: 
               - ${controller_shape}
               - "VM.Standard.E5.Flex"
+            - eq: 
+              - ${controller_shape}
+              - "VM.Standard.E6.Flex"
             - eq: 
               - ${controller_shape}
               - "VM.Standard.A1.Flex"
@@ -1071,6 +1080,9 @@ variables:
             - "VM.Standard.E5.Flex"
           - eq: 
             - ${instance_pool_shape}
+            - "VM.Standard.E6.Flex"
+          - eq: 
+            - ${instance_pool_shape}
             - "VM.Standard.A1.Flex"
           - eq:
             - ${instance_pool_shape}
@@ -1120,6 +1132,9 @@ variables:
             - "VM.Standard.E5.Flex"
           - eq: 
             - ${instance_pool_shape}
+            - "VM.Standard.E6.Flex"
+          - eq: 
+            - ${instance_pool_shape}
             - "VM.Standard.A1.Flex"
           - eq:
             - ${instance_pool_shape}
@@ -1147,6 +1162,9 @@ variables:
             - eq: 
               - ${instance_pool_shape}
               - "VM.Standard.E5.Flex"
+            - eq: 
+              - ${instance_pool_shape}
+              - "VM.Standard.E6.Flex"
             - eq: 
               - ${instance_pool_shape}
               - "VM.Standard.A1.Flex"
@@ -1920,6 +1938,9 @@ configuration\" "
           - eq: 
             - ${login_shape}
             - "VM.Standard.E5.Flex"
+          - eq: 
+            - ${login_shape}
+            - "VM.Standard.E6.Flex"
           - eq:
             - ${login_shape}
             - "VM.Optimized3.Flex"
@@ -1974,6 +1995,9 @@ configuration\" "
             - "VM.Standard.E5.Flex"
           - eq: 
             - ${login_shape}
+            - "VM.Standard.E6.Flex"
+          - eq: 
+            - ${login_shape}
             - "VM.Standard.A1.Flex"
           - eq:
             - ${login_shape}
@@ -2002,6 +2026,9 @@ configuration\" "
             - eq: 
               - ${login_shape}
               - "VM.Standard.E5.Flex"
+            - eq: 
+              - ${login_shape}
+              - "VM.Standard.E6.Flex"
             - eq: 
               - ${login_shape}
               - "VM.Standard.A1.Flex"
