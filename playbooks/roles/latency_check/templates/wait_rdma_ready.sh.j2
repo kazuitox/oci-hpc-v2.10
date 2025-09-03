@@ -1,0 +1,86 @@
+#!/bin/sh
+# wait_rdma_ready.sh — OCI HPC shapes 用 /bin/sh 互換
+set -eu
+
+# --- 1) UCX_NET_DEVICES を決定 ---
+{% if shape == "BM.Optimized3.36" %}
+RDMA_OPTIONS='-x UCX_NET_DEVICES=mlx5_2:1 -x UCX_IB_TRAFFIC_CLASS=105 -x UCX_IB_GID_INDEX=3'
+{% elif shape == "BM.HPC2.36" %}
+RDMA_OPTIONS='-x UCX_NET_DEVICES=mlx5_0:1 -x UCX_IB_TRAFFIC_CLASS=105 -x UCX_IB_GID_INDEX=3'
+{% else %}
+# それ以外の shape の場合は即 OK
+echo "OK"
+exit 0
+{% endif %}
+
+UCX_DEV="${UCX_NET_DEVICES:-}"
+if [ -z "${UCX_DEV}" ]; then
+  UCX_DEV=$(printf '%s\n' "$RDMA_OPTIONS" | sed -n 's/.*UCX_NET_DEVICES=\([^[:space:]]*\).*/\1/p' || true)
+fi
+
+if [ -z "${UCX_DEV}" ]; then
+  echo "UCX_NET_DEVICES not found" >&2
+  exit 1
+fi
+
+mlx=$(printf '%s' "$UCX_DEV" | awk -F: '{print $1}')
+port=$(printf '%s' "$UCX_DEV" | awk -F: '{print ($2==""?1:$2)}')
+
+case "$mlx" in
+  mlx5_[0-9]*) : ;;
+  *) echo "UCX_NET_DEVICES not parsable: $UCX_DEV" >&2; exit 1 ;;
+esac
+
+# --- 2) mlx5_x:port -> OS の netdev 名へ解決 ---
+get_netdev_from_ibdev2netdev() {
+  if command -v ibdev2netdev >/dev/null 2>&1; then
+    ibdev2netdev | awk -v m="$mlx" -v p="$port" '
+      $1==m && $2=="port" && $3==p && $4=="==>" {print $5; exit}
+    '
+  fi
+}
+
+get_netdev_from_sysfs() {
+  if [ -d "/sys/class/infiniband/$mlx/ports/$port/gid_attrs/ndevs" ]; then
+    for f in /sys/class/infiniband/"$mlx"/ports/"$port"/gid_attrs/ndevs/*; do
+      [ -f "$f" ] || continue
+      cat "$f" 2>/dev/null && return 0
+    done
+  fi
+  if [ -d "/sys/class/infiniband/$mlx/device/net" ]; then
+    ls /sys/class/infiniband/"$mlx"/device/net 2>/dev/null | head -n1
+  fi
+}
+
+resolve_netdev() {
+  n="$(get_netdev_from_ibdev2netdev || true)"
+  [ -n "${n:-}" ] || n="$(get_netdev_from_sysfs || true)"
+  printf '%s' "${n:-}"
+}
+
+# --- 3) Link/IPv4 の準備完了を待つ ---
+timeout_sec=240
+interval_sec=4
+start_ts=$(date +%s)
+
+while :; do
+  now_ts=$(date +%s)
+  elapsed=$((now_ts - start_ts))
+  if [ "$elapsed" -ge "$timeout_sec" ]; then
+    netdev="$(resolve_netdev || true)"
+    echo "RDMA netdev for ${mlx}:${port} not ready (netdev=${netdev:-unknown}, timeout)" >&2
+    exit 1
+  fi
+
+  netdev="$(resolve_netdev || true)"
+  if [ -n "${netdev:-}" ]; then
+    if ip -br link show dev "$netdev" 2>/dev/null | grep -q "UP"; then
+      if ip -4 addr show dev "$netdev" 2>/dev/null | grep -q 'inet '; then
+        echo "OK"
+        exit 0
+      fi
+    fi
+  fi
+
+  sleep "$interval_sec"
+done

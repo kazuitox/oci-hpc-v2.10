@@ -1,4 +1,21 @@
 ---
+- name: Copy RDMA wait script
+  become: true
+  template:
+    src: wait_rdma_ready.sh.j2
+    dest: /tmp/wait_rdma_ready.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Wait until RDMA interface is ready on all nodes
+  become: true
+  command: /tmp/wait_rdma_ready.sh
+  register: rdma_wait
+  retries: 30         # 4s * 30 ≈ 120s（スクリプト内部は240sまで粘る）
+  delay: 4
+  until: rdma_wait.rc == 0
+
 - name: copy script
   template:
     src: latency_check.sh.j2
