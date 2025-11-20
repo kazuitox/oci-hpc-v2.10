@@ -1,7 +1,4 @@
 --- 
-- name: Enable ol8_codeready_builder repo
-  command: yum-config-manager --enable ol8_codeready_builder
-  become: true
 
 - name: install required packages
   vars: 
