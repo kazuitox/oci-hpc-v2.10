@@ -7,7 +7,7 @@ then
 fi
 
 # --- debug 判定（従来通り） ---
-if [ ${@: -1} == "-DEBUG" ]
+if [ "${@: -1}" == "-DEBUG" ]
 then
   debug=1
 else
