@@ -76,3 +76,4 @@ zone_name=${zone_name}
 dns_entries=${dns_entries}
 healthchecks=${healthchecks}
 timezone=${timezone}
+tags=${tags}

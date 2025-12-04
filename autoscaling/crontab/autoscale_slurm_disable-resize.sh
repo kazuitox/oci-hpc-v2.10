@@ -332,6 +332,7 @@ def getAutoscaling():
     return autoscaling_value
 
 
+
 autoscaling = getAutoscaling()
 
 if autoscaling == "true":
@@ -414,7 +415,7 @@ if autoscaling == "true":
                 print("Creating cluster " + clusterName +
                       " with " + str(nodes) + " nodes")
                 subprocess.Popen([script_path + '/create_cluster.sh', str(nodes),
-                                 clusterName, instance_type, queue, jobID, user])
+                                 clusterName, instance_type, queue, jobID, ""])
                 time.sleep(5)
     except Exception:
         traceback.print_exc()

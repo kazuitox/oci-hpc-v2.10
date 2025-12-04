@@ -5,15 +5,11 @@ then
   echo "To avoid deleting clusters if an error occurs. Add -DEBUG as last argument"
   exit
 fi
+
+# --- debug 判定（従来通り） ---
 if [ ${@: -1} == "-DEBUG" ]
 then
   debug=1
-  if [ $6 == "-DEBUG" ]
-  then
-    tags=""
-  else
-    tags=$6
-  fi
 else
   debug=0
 fi
@@ -35,24 +31,51 @@ queues_conf=$conf_folder/queues.conf
 
 cp -r $autoscaling_folder/tf_init $autoscaling_folder/clusters/$2
 cd $autoscaling_folder/clusters/$2
-shape=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.shape " $queues_conf`
-cluster_network=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.cluster_network " $queues_conf`
-compute_cluster=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.compute_cluster " $queues_conf`
-targetCompartment=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.targetCompartment " $queues_conf`
-ADNames=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.ad " $queues_conf`
-boot_volume_size=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.boot_volume_size " $queues_conf`
-use_marketplace_image=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.use_marketplace_image " $queues_conf`
-image=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.image " $queues_conf`
-instance_pool_ocpus=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.instance_pool_ocpus " $queues_conf`
-instance_pool_memory=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.instance_pool_memory " $queues_conf`
-instance_pool_custom_memory=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.instance_pool_custom_memory " $queues_conf`
-marketplace_listing=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.marketplace_listing " $queues_conf`
-hyperthreading=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.hyperthreading " $queues_conf`
-region=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.region " $queues_conf`
-private_subnet=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.private_subnet " $queues_conf`
-private_subnet_id=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") |.private_subnet_id " $queues_conf`
 
+# --- queues.conf から各種設定値を取得 ---
+shape=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .shape " $queues_conf`
+cluster_network=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .cluster_network " $queues_conf`
+compute_cluster=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .compute_cluster " $queues_conf`
+targetCompartment=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .targetCompartment " $queues_conf`
+ADNames=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .ad " $queues_conf`
+boot_volume_size=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .boot_volume_size " $queues_conf`
+use_marketplace_image=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .use_marketplace_image " $queues_conf`
+image=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .image " $queues_conf`
+instance_pool_ocpus=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .instance_pool_ocpus " $queues_conf`
+instance_pool_memory=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .instance_pool_memory " $queues_conf`
+instance_pool_custom_memory=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .instance_pool_custom_memory " $queues_conf`
+marketplace_listing=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .marketplace_listing " $queues_conf`
+hyperthreading=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .hyperthreading " $queues_conf`
+region=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .region " $queues_conf`
+private_subnet=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .private_subnet " $queues_conf`
+private_subnet_id=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .private_subnet_id " $queues_conf`
 
+cli_tags=""
+if [ $debug -eq 1 ]; then
+  if [ "${6-}" != "-DEBUG" ]; then
+    cli_tags="${6-}"
+  fi
+else
+  cli_tags="${6-}"
+fi
+
+# 2) queues.conf から取得（マルチドキュメント対応：EMPTY を除外し最初の行だけ取る）
+q_tags="$(yq e '.queues[] | select(.name=="'"$4"'").tags // "EMPTY"' "$queues_conf" | grep -v '^EMPTY$' | head -n1)"
+if [ -z "$q_tags" ]; then
+  q_tags="$(yq e '.queues[] | select(.name=="'"$4"'") | .instance_types[]? | select(.name=="'"$3"'").tags // "EMPTY"' "$queues_conf" | grep -v '^EMPTY$' | head -n1)"
+fi
+
+# 3) 最終決定
+if [ -n "$cli_tags" ]; then
+  tags="$cli_tags"
+elif [ -n "$q_tags" ]; then
+  tags="$q_tags"
+else
+  tags="$USER"
+fi
+
+# sed 安全化
+esc_tags="$(printf '%s' "$tags" | sed -e 's/[~&]/\\&/g')"
 
 if [ "$shape" == "" ]
 then
@@ -67,7 +90,9 @@ do
 
   echo $1 $3 $4 >> currently_building
   echo $3 $4 > cluster_options
-  sed "s~##NODES##~$1~g;s~##NAME##~$2~g;s~##SHAPE##~$shape~g;s~##CN##~$cluster_network~g;s~##QUEUE##~${4}~g;s~##COMP##~${targetCompartment}~g;s~##AD##~${ADName}~g;s~##BOOT##~${boot_volume_size}~g;s~##USEMP##~${use_marketplace_image}~g;s~##IMAGE##~${image}~g;s~##OCPU##~${instance_pool_ocpus}~g;s~##MEM##~${instance_pool_memory}~g;s~##CUSTOM_MEM##~${instance_pool_custom_memory}~g;s~##MP_LIST##~${marketplace_listing}~g;s~##HT##~${hyperthreading}~g;s~##INST_TYPE##~$3~g;s~##TAGS##~$tags~g;s~##REGION##~${region}~g;s~##PRIVATE_SUBNET_ID##~${private_subnet_id}~g;s~##PRIVATE_SUBNET##~${private_subnet}~g;s~##CC##~$compute_cluster~g" $conf_folder/variables.tf > variables.tf
+
+  # variables.tf へ置換（##TAGS## は esc_tags を使用）
+  sed "s~##NODES##~$1~g;s~##NAME##~$2~g;s~##SHAPE##~$shape~g;s~##CN##~$cluster_network~g;s~##QUEUE##~${4}~g;s~##COMP##~${targetCompartment}~g;s~##AD##~${ADName}~g;s~##BOOT##~${boot_volume_size}~g;s~##USEMP##~${use_marketplace_image}~g;s~##IMAGE##~${image}~g;s~##OCPU##~${instance_pool_ocpus}~g;s~##MEM##~${instance_pool_memory}~g;s~##CUSTOM_MEM##~${instance_pool_custom_memory}~g;s~##MP_LIST##~${marketplace_listing}~g;s~##HT##~${hyperthreading}~g;s~##INST_TYPE##~$3~g;s~##TAGS##~${esc_tags}~g;s~##REGION##~${region}~g;s~##PRIVATE_SUBNET_ID##~${private_subnet_id}~g;s~##PRIVATE_SUBNET##~${private_subnet}~g;s~##CC##~$compute_cluster~g" $conf_folder/variables.tf > variables.tf
 
   echo "Started to build $2"
   start=`date -u +%s`

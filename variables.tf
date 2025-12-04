@@ -286,3 +286,4 @@ variable "percentage_of_cores_enabled" {
   default = "Default"
 }
 variable "timezone" { default = "Asia/Tokyo" }
+variable "tags" { default = "user" }

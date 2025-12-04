@@ -208,6 +208,11 @@ variableGroups:
     variables: 
       - ${configure}
 variables:
+  tags:
+    type: string
+    titile: "un visible internal var"
+    default: user
+    visible: false
   timezone:
     title: "Select your local timezone"
     type: enum
