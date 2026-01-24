@@ -65,6 +65,19 @@ resource "oci_core_security_list" "public-security-list" {
       min = "3000"
     }
   }
+
+  dynamic "ingress_security_rules" {
+    for_each = var.use_ood ? [1] : []
+    content {
+      protocol = "6"
+      source   = "0.0.0.0/0"
+      tcp_options {
+        min = "443"
+        max = "443"
+      }
+    }
+  }
+
   ingress_security_rules { 
     protocol = "1"
     source = "0.0.0.0/0"

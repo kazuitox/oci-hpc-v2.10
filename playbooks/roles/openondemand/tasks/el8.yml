@@ -1,0 +1,171 @@
+---
+- block:
+    - name: Set facts | Resolve servername/private_ip for OOD
+      ansible.builtin.set_fact:
+        ood_servername: >-
+          {{ controller_public_ip
+             | default(ansible_host
+             | default(ansible_default_ipv4.address)) }}
+        ood_private_ip: "{{ ansible_host | default(ansible_default_ipv4.address) }}"
+
+    - name: Install packages for repo management (dnf plugins)
+      ansible.builtin.dnf:
+        name:
+          - dnf-plugins-core
+        state: present
+
+    - name: Enable EPEL release
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+
+    - name: Enable required Oracle Linux repos (yum-config-manager)
+      ansible.builtin.command: "yum-config-manager --enable {{ item }}"
+      changed_when: true
+      loop:
+        - ol8_codeready_builder
+        - ol8_developer_EPEL
+
+    - name: Enable module ruby:3.3
+      ansible.builtin.command: "dnf -y module enable ruby:3.3"
+      changed_when: true
+
+    - name: Enable module nodejs:20
+      ansible.builtin.command: "dnf -y module enable nodejs:20"
+      changed_when: true
+
+    - name: Install Open OnDemand repo release rpm
+      ansible.builtin.dnf:
+        name: "https://yum.osc.edu/ondemand/4.0/ondemand-release-web-4.0-1.el8.noarch.rpm"
+        state: present
+        disable_gpg_check: true
+
+    - name: Install ondemand and mod_authnz_pam
+      ansible.builtin.dnf:
+        name:
+          - ondemand
+          - mod_authnz_pam
+        state: present
+
+    - name: Enable and start httpd
+      ansible.builtin.service:
+        name: httpd
+        enabled: true
+        state: started
+
+    - name: Ensure authnz_pam module is enabled
+      ansible.builtin.lineinfile:
+        path: /etc/httpd/conf.modules.d/55-authnz_pam.conf
+        regexp: '^\s*#\s*LoadModule\s+authnz_pam_module\s+modules/mod_authnz_pam\.so\s*$'
+        line: 'LoadModule authnz_pam_module modules/mod_authnz_pam.so'
+
+    - name: Ensure directories for TLS files exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /etc/pki/tls/private
+        - /etc/pki/tls/certs
+
+    - name: Generate self-signed certificate
+      ansible.builtin.command: >
+        openssl req -new -newkey rsa:4096 -nodes -x509 -sha256 -days 825
+        -keyout /etc/pki/tls/private/ood-ip.key
+        -out /etc/pki/tls/certs/ood-ip.crt
+        -subj "/CN={{ ood_servername }}"
+        -addext "subjectAltName = IP:{{ ood_private_ip }}"
+      args:
+        creates: "/etc/pki/tls/certs/ood-ip.crt"
+
+    - name: Install self-signed cert into local trust anchors
+      ansible.builtin.copy:
+        src: /etc/pki/tls/certs/ood-ip.crt
+        remote_src: true
+        dest: "/etc/pki/ca-trust/source/anchors/ood-ip.crt"
+        mode: "0644"
+
+    - name: Update CA trust
+      ansible.builtin.command: "update-ca-trust extract"
+      changed_when: true
+
+    - name: Ensure OOD config directory exists
+      ansible.builtin.file:
+        path: /etc/ood/config
+        state: directory
+        mode: "0755"
+
+    - name: Deploy ood_portal.yml
+      ansible.builtin.copy:
+        dest: /etc/ood/config/ood_portal.yml
+        mode: "0644"
+        content: |
+          ---
+          servername: "{{ ood_servername }}"
+
+          ssl:
+            - 'SSLCertificateFile "/etc/pki/tls/certs/ood-ip.crt"'
+            - 'SSLCertificateKeyFile "/etc/pki/tls/private/ood-ip.key"'
+
+          auth:
+            - 'AuthType Basic'
+            - 'AuthName "Open OnDemand"'
+            - 'AuthBasicProvider PAM'
+            - 'AuthPAMService ood'
+            - 'Require valid-user'
+
+    - name: Ensure PAM service file for OOD exists
+      ansible.builtin.copy:
+        src: /etc/pam.d/sshd
+        remote_src: true
+        dest: /etc/pam.d/ood
+        mode: "0644"
+
+    - name: Generate/Update OOD Apache portal config
+      ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal"
+      changed_when: true
+
+    - name: Ensure clusters.d directory exists
+      ansible.builtin.file:
+        path: /etc/ood/config/clusters.d
+        state: directory
+        mode: "0755"
+
+    - name: Deploy Slurm cluster definition
+      ansible.builtin.copy:
+        dest: /etc/ood/config/clusters.d/myslurm.yml
+        mode: "0644"
+        content: |
+          ---
+          v2:
+            metadata:
+              title: "OCI HPC Cluster"
+            login:
+              host: "{{ ood_private_ip }}"
+            job:
+              adapter: "slurm"
+              bin: "/usr/bin"
+              conf: "/etc/slurm/slurm.conf"
+              copy_environment: false
+
+    - name: Apache config test
+      ansible.builtin.command: apachectl configtest
+      register: apache_configtest
+      changed_when: false
+
+    - name: Restart httpd (do not block)
+      ansible.builtin.systemd:
+        name: httpd
+        state: restarted
+        no_block: true
+
+    - name: Wait until httpd becomes active
+      ansible.builtin.command: systemctl is-active httpd
+      register: httpd_active
+      retries: 30
+      delay: 2
+      until: httpd_active.stdout.strip() == "active"
+      changed_when: false
+
+  become: true
+

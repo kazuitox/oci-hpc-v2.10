@@ -332,3 +332,9 @@
     - include_role: 
         name: slurm
       when: slurm|default(false)|bool
+
+- hosts: controller
+  tasks:
+    - include_role:
+        name: openondemand
+      when: use_ood|default(false)|bool

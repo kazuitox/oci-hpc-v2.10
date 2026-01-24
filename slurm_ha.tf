@@ -185,6 +185,7 @@ resource "null_resource" "cluster_backup" {
   provisioner "file" {
     content        = templatefile("${path.module}/inventory.tpl", {  
       controller_name = oci_core_instance.controller.display_name, 
+      controller_public_ip = oci_core_instance.controller.public_ip,
       controller_ip = oci_core_instance.controller.private_ip,
       backup_name = var.slurm_ha ? oci_core_instance.backup[0].display_name : "",
       backup_ip = var.slurm_ha ? oci_core_instance.backup[0].private_ip: "",
@@ -221,6 +222,7 @@ resource "null_resource" "cluster_backup" {
       spack = var.spack,
       ldap = var.ldap,
       timezone = var.timezone,
+      use_ood = var.use_ood,
       tags = var.tags,
       controller_block = var.controller_block, 
       login_block = var.login_block, 
@@ -330,6 +332,7 @@ resource "null_resource" "cluster_backup" {
   provisioner "file" {
     content        = templatefile("${path.module}/conf/variables.tpl", {  
       controller_name = oci_core_instance.controller.display_name, 
+      controller_public_ip = oci_core_instance.controller.public_ip,
       controller_ip = oci_core_instance.controller.private_ip, 
       backup_name = var.slurm_ha ? oci_core_instance.backup[0].display_name : "",
       backup_ip = var.slurm_ha ? oci_core_instance.backup[0].private_ip: "",
@@ -351,6 +354,7 @@ resource "null_resource" "cluster_backup" {
       spack = var.spack,
       ldap = var.ldap,
       timezone = var.timezone,
+      use_ood = var.use_ood,
       tags = var.tags,
       controller_block = var.controller_block, 
       login_block = var.login_block, 
