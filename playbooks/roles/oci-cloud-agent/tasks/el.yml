@@ -46,13 +46,14 @@
   retries: 5
   register: unregister_cloud_agent
   until: unregister_cloud_agent is not failed
+  ignore_errors: yes
 
 # Present in OL images prior to May/June 2020, later replaced with oracle cloud agent
 - name: Check if osms-agent service exist
   shell: service osms-agent status
   register: osms_agent_status
   failed_when: not(osms_agent_status.rc == 3 or osms_agent_status.rc == 0 or osms_agent_status.rc == 4)
-  ignore_errors: True
+  ignore_errors: yes
 
 - name: disable osms-agent.service
   service:
@@ -79,4 +80,4 @@
 - name: Kill Yum Process
   shell: "sudo kill -9 {{yum_process.stdout}}"
   when: yum_process.stdout != ""
-  ignore_errors: True
+  ignore_errors: yes

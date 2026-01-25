@@ -48,7 +48,7 @@
     - name: Install MySQL packages ol8
       vars: 
         package_name: "{{ mysql_packages_ol8 }}"
-        package_repo: ol8_MySQL80
+        package_repo: "ol8_MySQL80,ol8_MySQL80_connectors_community"
       include_role: 
         name: safe_yum
 
