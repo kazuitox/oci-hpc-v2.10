@@ -54,7 +54,7 @@ variable "marketplace_version_id" {
   type = map(string) 
   default = { 
        "HPC_OL7" = "OracleLinux-7-OCA-RHCK-OFED-23.10-2.1.3.1-2024.03.15-0"
-       "HPC_OL8" = "OracleLinux-8-OCA-RHCK-OFED-23.10-2.1.3.1-2024.03.15-0"
+       "HPC_OL8" = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0"
        "GPU_OL7_CUDA12.2" = "OracleLinux-7-OCA-RHCK-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.03.15-0"
        "GPU_OL8_CUDA12.2" = "OracleLinux-8-OCA-RHCK-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.2-2024.03.15-0"
        "GPU_OL7_CUDA12.4" = "OracleLinux-7-OCA-RHCK-OFED-23.10-2.1.3.1-GPU-535-CUDA-12.4-2024.03.15-0"
