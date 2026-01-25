@@ -1,0 +1,9 @@
+---
+- name: OpenOnDemand | include EL8 tasks (Oracle Linux 8)
+  include_tasks: el8.yml
+  when:
+    - use_ood | default(false) | bool
+    - ansible_os_family == 'RedHat'
+    - ansible_distribution == 'OracleLinux'
+    - ansible_distribution_major_version | string == '8'
+

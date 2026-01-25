@@ -175,6 +175,7 @@ variableGroups:
       - ${slurm}
       - ${slurm_nfs}
       - ${slurm_ha}
+      - ${use_ood}
       - ${rack_aware}
       - ${queue}
       - ${spack}
@@ -1591,6 +1592,12 @@ configuration\" "
       and:
         - ${slurm}
         - ${add_nfs}
+
+  use_ood:
+    type: boolean
+    title: "Install Open OnDemand"
+    default: false
+    description: "Open OnDemand is a web-based platform that provides secure, browser-based access to HPC resources, enabling users to run applications, manage files, and submit jobs without needing direct SSH access."
 
   slurm_ha:
     type: boolean

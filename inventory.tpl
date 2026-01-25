@@ -16,6 +16,7 @@ ${host} ansible_host=${ip} ansible_user=${compute_username} role=compute
 compute_to_add
 compute_configured
 [all:vars]
+controller_public_ip = ${controller_public_ip}
 ansible_connection=ssh
 rdma_network=${rdma_network}
 rdma_netmask=${rdma_netmask}
@@ -81,3 +82,4 @@ zone_name=${zone_name}
 dns_entries=${dns_entries}
 healthchecks=${healthchecks}
 timezone=${timezone}
+use_ood=${use_ood}
