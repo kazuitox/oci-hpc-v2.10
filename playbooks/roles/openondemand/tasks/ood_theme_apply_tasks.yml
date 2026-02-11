@@ -1,0 +1,31 @@
+- name: "OOD theme | Ensure public assets directory exists"
+  ansible.builtin.file:
+    path: /var/www/ood/public
+    state: directory
+    mode: "0755"
+
+- name: "OOD theme | Download public assets (logo/css/favicon)"
+  ansible.builtin.get_url:
+    url: "{{ ood_theme_assets_base_url.rstrip('/') }}/{{ item }}"
+    dest: "/var/www/ood/public/{{ item | basename }}"
+    mode: "0644"
+    force: true
+  loop: "{{ ood_theme_assets }}"
+
+- name: "OOD theme | Ensure ondemand.d directory exists"
+  ansible.builtin.file:
+    path: /etc/ood/config/ondemand.d
+    state: directory
+    mode: "0755"
+
+- name: "OOD theme | Install Oracle UX config (oracle_ux.yml)"
+  ansible.builtin.get_url:
+    url: "{{ ood_ux_config_url }}"
+    dest: /etc/ood/config/ondemand.d/oracle_ux.yml
+    mode: "0644"
+    force: true
+
+- name: "OOD theme | Regenerate/Update OOD Apache portal config (safe re-run)"
+  ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal"
+  changed_when: true
+

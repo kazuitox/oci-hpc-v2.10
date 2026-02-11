@@ -148,6 +148,17 @@
               conf: "/etc/slurm/slurm.conf"
               copy_environment: false
 
+    - name: Apply OOD theme/branding
+      ansible.builtin.include_tasks: ood_theme_apply_tasks.yml
+      vars:
+        ood_theme_assets_base_url: "https://raw.githubusercontent.com/koiker/oci-hpc/master/artifacts/ondemand"
+        ood_theme_assets:
+          - "oci_logo.png"
+          - "header_logo.png"
+          - "oj-redwood-min.css"
+          - "favicon.ico"
+        ood_ux_config_url: "https://raw.githubusercontent.com/koiker/oci-hpc/master/artifacts/ondemand/oracle_ux.yml"
+
     - name: Apache config test
       ansible.builtin.command: apachectl configtest
       register: apache_configtest
