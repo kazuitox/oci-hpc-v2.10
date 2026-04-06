@@ -1,3 +1,10 @@
+- hosts: compute
+  become: true
+  vars:
+    destroy: false
+  gather_facts: true
+  roles:
+    - oci-hostname
 
 - hosts: compute
   become: true
@@ -23,7 +30,6 @@
     destroy: false
   gather_facts: true
   roles: 
-    - oci-hostname
     - ssh
     - mpi-hostfiles
     - boot-volume

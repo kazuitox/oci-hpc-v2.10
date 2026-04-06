@@ -1,3 +1,10 @@
+- hosts: compute
+  become: true
+  vars:
+    destroy: false
+  gather_facts: true
+  roles:
+    - oci-hostname
 
 - hosts: compute
   become: true
@@ -29,7 +36,6 @@
     - oci-legacy
     - packages
     - firewall 
-    - oci-hostname
     - ssh
     - limits
     - mpi-hostfiles
