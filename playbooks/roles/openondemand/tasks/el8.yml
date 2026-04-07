@@ -178,5 +178,70 @@
       until: httpd_active.stdout.strip() == "active"
       changed_when: false
 
+    - name: OpenOnDemand | Update bc_desktop submit.yml.erb
+      ansible.builtin.copy:
+        dest: /var/www/ood/apps/sys/bc_desktop/submit.yml.erb
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          ---
+          batch_connect:
+            template: vnc
+          cluster: "myslurm"
+          script:
+            queue_name: <%= bc_queue %>
+
+    - name: OpenOnDemand | Update bc_desktop form.yml
+      ansible.builtin.copy:
+        dest: /var/www/ood/apps/sys/bc_desktop/form.yml
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          ---
+          cluster: "myslurm"
+    
+          attributes:
+            bc_vnc_idle: 0
+            bc_vnc_resolution:
+              required: true
+            desktop:
+              label: "Desktop Environment"
+              widget: select
+              options:
+                - "gnome"
+            node_type: null
+    
+          form:
+            - bc_vnc_idle
+            - desktop
+            - bc_account
+            - bc_num_hours
+            - bc_num_slots
+            - node_type
+            - bc_queue
+            - bc_vnc_resolution
+            - bc_email_on_started
+
+    - name: OpenOnDemand | Add node routing settings to ood_portal.yml
+      ansible.builtin.blockinfile:
+        path: /etc/ood/config/ood_portal.yml
+        marker: "# {mark} ANSIBLE MANAGED BLOCK FOR OOD NODE ROUTING"
+        insertafter: EOF
+        block: |
+          host_regex: 'compute-hpc-node-[0-9]+'
+          node_uri: '/node'
+          rnode_uri: '/rnode'
+
+    - name: OpenOnDemand | Regenerate Apache config
+      ansible.builtin.command: /opt/ood/ood-portal-generator/sbin/update_ood_portal
+      changed_when: true
+
+    - name: OpenOnDemand | Restart httpd
+      ansible.builtin.service:
+        name: httpd
+        state: restarted
+
   become: true
 

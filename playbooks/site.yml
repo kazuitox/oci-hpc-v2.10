@@ -338,3 +338,11 @@
     - include_role:
         name: openondemand
       when: use_ood|default(false)|bool
+
+- hosts: compute
+  become: true
+  gather_facts: true
+  tasks:
+    - include_role:
+        name: desktop
+      when: use_ood|default(false)|bool

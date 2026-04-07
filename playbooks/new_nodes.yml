@@ -190,6 +190,14 @@
     - include_role: 
         name: fix_ldap
       when: ldap|default(true)|bool
+
+- hosts: compute
+  become: true
+  gather_facts: true
+  tasks:
+    - include_role:
+        name: desktop
+      when: use_ood|default(false)|bool
       
 - hosts: compute, slurm_backup
   vars:
