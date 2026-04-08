@@ -57,6 +57,7 @@ resource "local_file" "inventory" {
     ldap = var.ldap,
     timezone = var.timezone,
     tags = var.tags,
+    use_ood = var.use_ood,
     controller_block = var.controller_block,
     login_block = var.login_block,
     scratch_nfs_type = local.scratch_nfs_type,

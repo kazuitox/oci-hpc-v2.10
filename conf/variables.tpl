@@ -157,4 +157,5 @@ variable "numa_nodes_per_socket" {
 variable "percentage_of_cores_enabled" {
   default = "${percentage_of_cores_enabled}"
 }
-variable "timezone" { default = "Asia/Tokyo" }
+variable "timezone" { default = "${timezone}" }
+variable "use_ood" { default = "${use_ood}" }

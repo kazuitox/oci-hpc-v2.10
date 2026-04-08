@@ -77,3 +77,4 @@ dns_entries=${dns_entries}
 healthchecks=${healthchecks}
 timezone=${timezone}
 tags=${tags}
+use_ood=${use_ood}
