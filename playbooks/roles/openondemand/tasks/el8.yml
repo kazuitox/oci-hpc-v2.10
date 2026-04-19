@@ -230,7 +230,7 @@
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR OOD NODE ROUTING"
         insertafter: EOF
         block: |
-          host_regex: 'compute-hpc-node-[0-9]+'
+          host_regex: 'compute-[\w-]+'
           node_uri: '/node'
           rnode_uri: '/rnode'
 
