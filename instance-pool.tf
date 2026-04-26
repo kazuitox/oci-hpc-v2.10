@@ -19,8 +19,14 @@ resource "oci_core_volume_attachment" "instance_pool_volume_attachment" {
 
 
 resource "oci_core_instance_pool" "instance_pool" {
-  count = ( ! var.cluster_network ) && ( var.node_count > 0 ) ? 1 : 0
-  depends_on     = [oci_core_app_catalog_subscription.mp_image_subscription, oci_core_subnet.private-subnet, oci_core_subnet.public-subnet]
+  count = (!var.cluster_network) && (var.node_count > 0) ? 1 : 0
+  depends_on = [
+    oci_identity_policy.compute_management_autoscaling_policy,
+    oci_identity_policy.autoscaling_policy,
+    oci_core_app_catalog_subscription.mp_image_subscription,
+    oci_core_subnet.private-subnet,
+    oci_core_subnet.public-subnet,
+  ]
   compartment_id = var.targetCompartment
   instance_configuration_id = oci_core_instance_configuration.instance_pool_configuration[0].id
   size                      = var.node_count
@@ -38,4 +44,3 @@ resource "oci_core_instance_pool" "instance_pool" {
     create = local.timeout_ip
   }
 }
-

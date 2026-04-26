@@ -13,6 +13,14 @@ data "oci_core_services" "services" {
     regex  = true
   }
 }
+
+data "oci_identity_tenancy" "tenancy" {
+  tenancy_id = var.tenancy_ocid
+}
+
+data "oci_identity_regions" "regions" {
+}
+
 data "oci_core_cluster_network_instances" "cluster_network_instances" {
   count = (! var.compute_cluster) && var.cluster_network && var.node_count > 0 ? 1 : 0
   cluster_network_id = oci_core_cluster_network.cluster_network[0].id

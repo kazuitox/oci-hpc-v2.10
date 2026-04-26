@@ -19,7 +19,11 @@ resource "oci_core_volume_attachment" "compute_cluster_volume_attachment" {
 
 resource "oci_core_instance" "compute_cluster_instances" {
   count = var.compute_cluster ? var.node_count : 0
-  depends_on          = [oci_core_compute_cluster.compute_cluster]
+  depends_on = [
+    oci_core_compute_cluster.compute_cluster,
+    oci_identity_policy.compute_management_autoscaling_policy,
+    oci_identity_policy.autoscaling_policy,
+  ]
   availability_domain = var.ad
   compartment_id      = var.targetCompartment
   shape               = var.cluster_network_shape

@@ -19,7 +19,11 @@ resource "oci_core_volume_attachment" "login_volume_attachment" {
 
 resource "oci_core_instance" "login" {
   count = var.login_node ? 1 : 0
-  depends_on          = [oci_core_subnet.public-subnet]
+  depends_on = [
+    oci_core_subnet.public-subnet,
+    oci_identity_policy.compute_management_autoscaling_policy,
+    oci_identity_policy.autoscaling_policy,
+  ]
   availability_domain = var.login_ad
   compartment_id      = var.targetCompartment
   shape               = var.login_shape

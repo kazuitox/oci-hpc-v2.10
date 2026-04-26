@@ -1,4 +1,10 @@
-locals { 
+locals {
+  region_map = {
+    for region in data.oci_identity_regions.regions.regions :
+    region.key => region.name
+  }
+  home_region = local.region_map[data.oci_identity_tenancy.tenancy.home_region_key]
+
 // display names of instances 
   cluster_instances_ids = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.id : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.id : data.oci_core_instance.instance_pool_instances.*.id
   cluster_instances_names = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.display_name : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.display_name : data.oci_core_instance.instance_pool_instances.*.display_name

@@ -10,7 +10,11 @@ resource "oci_core_volume_attachment" "backup_volume_attachment" {
 
 resource "oci_core_instance" "backup" {
   count = var.slurm_ha ? 1 : 0
-  depends_on          = [oci_core_subnet.public-subnet]
+  depends_on = [
+    oci_core_subnet.public-subnet,
+    oci_identity_policy.compute_management_autoscaling_policy,
+    oci_identity_policy.autoscaling_policy,
+  ]
   availability_domain = var.controller_ad
   compartment_id      = var.targetCompartment
   shape               = var.controller_shape
