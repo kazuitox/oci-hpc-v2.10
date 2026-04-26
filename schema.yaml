@@ -1,24 +1,24 @@
 ---
-title: HPC cluster
-description: Oracle Cloud HPC cluster
+title: HPC クラスタ
+description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
 version: '2026041502'
-informationalText: Automated HPC cluster deployment
+informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
   type: marketplace
   reference: 67628143
-locale: en
+locale: ja
 outputs:
   controller:
-    title: controller Instance Public IP
+    title: controller インスタンスのパブリック IP
     type: copyableString
     visible: true
 variableGroups:
-- title: Mode
+- title: モード
   variables:
   - ${ui_mode}
-- title: Simple configuration
+- title: 基本設定
   variables:
   - ${targetCompartment}
   - ${ad}
@@ -35,7 +35,7 @@ variableGroups:
   - ${instance_pool_ocpus_denseIO_flex}
   - ${instance_pool_custom_memory}
   - ${instance_pool_memory}
-- title: Cluster configuration
+- title: クラスタ設定
   variables:
   - ${timezone}
   - ${ldap}
@@ -43,7 +43,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Headnode options
+- title: Headnode オプション
   variables:
   - ${controller_shape}
   - ${controller_ocpus}
@@ -57,7 +57,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Compute node options
+- title: Compute node オプション
   variables:
   - ${use_multiple_ads}
   - ${secondary_ad}
@@ -88,7 +88,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Additional Login Node
+- title: 追加 Login Node
   variables:
   - ${login_node}
   - ${login_ad}
@@ -121,7 +121,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: API authentication, needed for autoscaling
+- title: Autoscaling に必要な API 認証
   variables:
   - ${inst_prin}
   - ${api_user_ocid}
@@ -131,7 +131,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Monitoring
+- title: 監視
   variables:
   - ${autoscaling_mysql_service}
   - ${monitoring_shape_name}
@@ -145,7 +145,7 @@ variableGroups:
     - and:
       - ${autoscaling_monitoring}
       - ${autoscaling}
-- title: Additional file system
+- title: 追加ファイルシステム
   variables:
   - ${add_nfs}
   - ${create_fss}
@@ -158,7 +158,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Advanced controller options
+- title: controller 詳細オプション
   variables:
   - ${use_marketplace_image_controller}
   - ${marketplace_listing_controller}
@@ -171,7 +171,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Advanced storage options
+- title: ストレージ詳細オプション
   variables:
   - ${use_advanced}
   - ${home_nfs}
@@ -194,7 +194,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Network options
+- title: ネットワークオプション
   variables:
   - ${use_existing_vcn}
   - ${vcn_compartment}
@@ -213,7 +213,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Software
+- title: ソフトウェア
   variables:
   - ${privilege_sudo}
   - ${privilege_group_name}
@@ -234,7 +234,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Hidden
+- title: 非表示
   variables:
   - ${compartment_ocid}
   - ${region}
@@ -254,7 +254,7 @@ variableGroups:
   - ${controller_boot_volume_backup_time_zone}
   - ${controller_boot_volume_backup_type}
   visible: false
-- title: Debug
+- title: デバッグ
   variables:
   - ${configure}
   visible:
@@ -264,9 +264,8 @@ variableGroups:
 variables:
   ui_mode:
     type: enum
-    title: Input mode
-    description: Choose SIMPLE to show only the minimum required inputs, or ADVANCED
-      to show all configuration options.
+    title: 入力モード
+    description: SIMPLE では最小限の必須入力のみを表示し、ADVANCED ではすべての設定オプションを表示します。
     required: true
     default: SIMPLE
     enum:
@@ -276,9 +275,9 @@ variables:
     type: string
     default: user
     visible: false
-    title: un visible internal var
+    title: 非表示の内部変数
   timezone:
-    title: Select your local timezone
+    title: ローカルタイムゾーンを選択
     type: enum
     default: Asia/Tokyo
     required: true
@@ -709,15 +708,14 @@ variables:
     - Pacific/Wallis
     - UTC
   targetCompartment:
-    title: target compartment
+    title: ターゲットコンパートメント
     type: oci:identity:compartment:id
     default: ${compartment_ocid}
     required: true
   use_multiple_ads:
     type: boolean
-    title: Multiple ADs
-    description: Use multiple ADs in case of capacity constraints (Autoscaling Only)
-      Autoscaling will try another AD upon failure.
+    title: 複数ADを利用
+    description: 容量制約に備えて複数 AD を使用します（Autoscaling のみ）。失敗時には Autoscaling が別の AD を試行します。
     default: false
   ad:
     type: oci:identity:availabilitydomain:name
@@ -732,35 +730,34 @@ variables:
     dependsOn:
       compartmentId: ${targetCompartment}
     required: false
-    description: Secondary Availability Domain
-    title: Secondary Availability Domain
+    description: 2 番目の Availability Domain
+    title: 2 番目の Availability Domain
   third_ad:
     type: oci:identity:availabilitydomain:name
     visible: ${use_multiple_ads}
     dependsOn:
       compartmentId: ${targetCompartment}
     required: false
-    description: Third Availability Domain
-    title: Third Availability Domain
+    description: 3 番目の Availability Domain
+    title: 3 番目の Availability Domain
   ssh_key:
     type: oci:core:ssh:publickey
-    title: Public SSH key
-    description: Public SSH key
+    title: 公開 SSH キー
+    description: 公開 SSH キー
     required: true
   use_custom_name:
     type: boolean
-    title: use custom cluster name
-    description: Use custom name for the cluster
+    title: クラスタ名を接頭辞(Prefix)を指定
+    description: クラスタにカスタム名を指定します
     default: true
   ldap:
     type: boolean
-    title: Configure LDAP authentication from controller
-    description: When selected nodes will be configured to use LDAP authentication.
-      User and group management can be performed using cluster commands.
+    title: controller から LDAP 認証を構成
+    description: 選択すると、node は LDAP 認証を使用するように構成されます。ユーザーとグループの管理はクラスタコマンドで実行できます。
     default: true
   cluster_name:
-    title: Name of the cluster
-    description: Custom cluster name
+    title: クラスタ接頭辞(Prefix)
+    description: クラスタ接頭辞
     default: ''
     type: string
     visible:
@@ -772,20 +769,20 @@ variables:
     dependsOn:
       compartmentId: ${targetCompartment}
     required: true
-    description: Availability Domain for controller host
+    description: controller ホストの Availability Domain
     title: Availability Domain
     default: ${ad}
   controller_shape:
-    title: Controller Shape
+    title: controller Shape
     type: oci:core:instanceshape:name
     dependsOn:
       compartmentId: ${targetCompartment}
     required: true
     default: VM.Standard.E5.Flex
   controller_ocpus:
-    title: Cores
+    title: コア数
     type: integer
-    description: Number of OCPU's for flex shape
+    description: Flex Shape の OCPU 数
     minimum: 1
     maximum: 64
     default: 4
@@ -815,9 +812,9 @@ variables:
           - VM.Standard3.Flex
     required: true
   controller_ocpus_denseIO_flex:
-    title: Cores
+    title: コア数
     type: enum
-    description: Number of OCPU's for Dense IO flex shape
+    description: Dense IO Flex Shape の OCPU 数
     enum:
     - 8
     - 16
@@ -834,7 +831,7 @@ variables:
           - VM.DenseIO.E5.Flex
     required: true
   controller_custom_memory:
-    title: Use custom memory size
+    title: カスタムメモリサイズを使用
     type: boolean
     default: false
     visible:
@@ -862,9 +859,9 @@ variables:
           - ${controller_shape}
           - VM.Standard3.Flex
   controller_memory:
-    title: Memory in GBS
+    title: メモリサイズ (GB)
     type: integer
-    description: Number of memory for flex shape. Minimum 1GB per core.
+    description: Flex Shape のメモリサイズ。コアあたり最低 1GB。
     minimum: 1
     maximum: 1024
     default: 32
@@ -897,15 +894,13 @@ variables:
         - ${controller_custom_memory}
     required: true
   controller_object_storage_par:
-    title: Create Object Storage PAR
-    description: Create a PAR (i.e. Pre-Authenticated Request), so that user could
-      use that PAR to upload monitoring metrics to Object Storage and share the URL
-      with OCI service teams.
+    title: Object Storage PAR を作成
+    description: PAR（Pre-Authenticated Request）を作成します。ユーザーはこの PAR を使用して監視メトリックを Object Storage にアップロードし、URL を OCI service teams と共有できます。
     type: boolean
     default: false
   unsupported_controller:
-    title: Use unsupported image
-    description: Custom image ID for controller
+    title: サポート対象外 Image を使用
+    description: controller の Custom Image ID
     type: boolean
     default: false
     visible:
@@ -913,14 +908,14 @@ variables:
       - ${use_marketplace_image_controller}
   use_marketplace_image_controller:
     type: boolean
-    title: use marketplace image
-    description: Use marketplace image, otherwise provide custom image OCID
+    title: Marketplace Image を使用
+    description: Marketplace Image を使用します。使用しない場合は Custom Image OCID を指定します
     default: true
     visible: true
   marketplace_listing_controller:
     type: enum
-    title: Image version
-    description: Marketplace listing to use
+    title: Image バージョン
+    description: 使用する Marketplace リスティング
     required: true
     enum:
     - HPC_OL7
@@ -932,22 +927,21 @@ variables:
     default: HPC_OL8
     visible: ${use_marketplace_image_controller}
   controller_username:
-    title: Default username for controller
-    description: Custom image ID for controller
+    title: controller のデフォルトユーザー名
+    description: controller の Custom Image ID
     type: string
     default: opc
     required: true
     visible: true
   unsupported_controller_image:
     title: Image OCID
-    description: Custom image ID for compute nodes. Please note that only Oracle Linux
-      7 and Ubuntu 20.04 are supported as controller image at this moment.
+    description: compute node の Custom Image ID。現時点では controller Image として Oracle Linux 7 と Ubuntu 20.04 のみがサポートされています。
     type: string
     required: true
     visible: ${unsupported_controller}
     default: image.ocid
   controller_image_compartment:
-    title: controller image compartment
+    title: controller Image コンパートメント
     type: oci:identity:compartment:id
     default: ${targetCompartment}
     visible:
@@ -959,8 +953,7 @@ variables:
     required: true
   custom_controller_image:
     title: controller Image ID
-    description: 'Custom image ID for controller nodes. Please note that only Oracle
-      Linux 7, 8 and Ubuntu 20.04 are supported as controller image at this moment. '
+    description: 'controller node の Custom Image ID。現時点では controller Image として Oracle Linux 7、8 と Ubuntu 20.04 のみがサポートされています。'
     type: oci:core:image:id
     dependsOn:
       compartmentId: ${controller_image_compartment}
@@ -975,17 +968,16 @@ variables:
     type: integer
     required: true
     minimum: 50
-    title: Size of the boot volume in GB
+    title: Boot Volume サイズ (GB)
     default: 100
   controller_boot_volume_backup:
     type: boolean
-    title: Enable boot volume backup
-    description: 'Schedule: Daily, Type: Incremental, Start Time: 00:00 Regional Time,
-      Retention: 90 days.'
+    title: Boot Volume backup を有効化
+    description: 'スケジュール: 毎日、タイプ: Incremental、開始時刻: 00:00 Regional Time、保持期間: 90 日。'
     default: false
   controller_block:
     type: boolean
-    title: Additional block volume for shared space
+    title: 共有領域用の追加 Block Volume
     visible:
       and:
       - ${use_advanced}
@@ -993,7 +985,7 @@ variables:
   controller_block_volume_size:
     required: true
     type: integer
-    title: Size of the additional volume in GB
+    title: 追加 Volume サイズ (GB)
     default: 1000
     visible:
       and:
@@ -1002,7 +994,7 @@ variables:
         - ${use_advanced}
   controller_block_volume_performance:
     type: enum
-    title: Block volume performance
+    title: Block Volume パフォーマンス
     required: true
     enum:
     - 0.  Lower performance
@@ -1016,17 +1008,15 @@ variables:
         - ${use_advanced}
   home_nfs:
     type: boolean
-    title: shared NFS /home from controller. To use FSS, make sure you created one
-      or added NFS mount information
+    title: controller から /home を共有 NFS にします。FSS を使用する場合は、作成済みの FSS または NFS マウント情報を指定してください
     visible:
       and:
       - ${use_advanced}
     default: true
   home_fss:
     type: boolean
-    title: Use the mounted FSS/NFS as /home.
-    description: If not creating a new FSS, it will create a nfs_source_path/home
-      directory
+    title: マウント済み FSS/NFS を /home として使用
+    description: 新しい FSS を作成しない場合は、nfs_source_path/home ディレクトリを作成します
     visible:
       and:
       - ${use_advanced}
@@ -1035,14 +1025,14 @@ variables:
     default: false
   use_cluster_nfs:
     type: boolean
-    title: shared NFS volume from controller
+    title: controller から NFS Volume を共有
     visible:
       and:
       - ${use_advanced}
     default: true
   cluster_nfs_path:
-    title: Cluster share mount point
-    description: Path to NFS share
+    title: クラスタ共有マウントポイント
+    description: NFS 共有へのパス
     default: /nfs/cluster
     type: string
     visible:
@@ -1051,32 +1041,32 @@ variables:
       - ${use_cluster_nfs}
     required: true
   cluster_network:
-    title: Use cluster network
+    title: Cluster Network を使用
     type: boolean
-    description: Use ROCEv2 cluster network
+    description: RoCEv2 Cluster Network を使用します
     default: true
   compute_cluster:
-    title: Use compute cluster rather than cluster network
+    title: Cluster Network の代わりに Compute Cluster を使用
     type: boolean
-    description: Use compute cluster instead of cluster network
+    description: Cluster Network の代わりに Compute Cluster を使用します
     default: false
     visible: ${cluster_network}
   compute_cluster_exists:
-    title: Use existing Compute Cluster
+    title: 既存 Compute Cluster を使用
     type: boolean
-    description: The compute cluster already exists
+    description: Compute Cluster がすでに存在します
     default: false
     visible: ${compute_cluster}
   compute_cluster_id:
     title: Compute Cluster ID
     type: string
-    description: Specify the compute cluster OCID
+    description: Compute Cluster OCID を指定します
     default: ''
     visible: ${compute_cluster_exists}
   compute_cluster_start_index:
-    title: Start Index
+    title: 開始インデックス
     type: integer
-    description: Specify the start Index of the nodes in the compute cluster
+    description: Compute Cluster 内の node の開始インデックスを指定します
     default: 0
     visible: ${compute_cluster_exists}
   cluster_network_shape:
@@ -1090,14 +1080,14 @@ variables:
     - BM.Optimized3.36
     - BM.HPC.E5.144
     default: BM.Optimized3.36
-    title: Shape of the Compute Nodes
-    description: Shape of compute nodes used in permanent/initial cluster
+    title: Compute node の Shape
+    description: permanent/initial cluster で使用する Compute node の Shape
     required: true
     visible:
       and:
       - ${cluster_network}
   instance_pool_shape:
-    title: Shape of the Compute Nodes
+    title: Compute node の Shape
     required: true
     default: VM.Standard.E4.Flex
     type: oci:core:instanceshape:name
@@ -1106,11 +1096,11 @@ variables:
     visible:
       not:
       - ${cluster_network}
-    description: Shape of compute nodes used in permanent/initial cluster
+    description: permanent/initial cluster で使用する Compute node の Shape
   instance_pool_ocpus:
-    title: Cores
+    title: コア数
     type: integer
-    description: Number of OCPU's for flex shape
+    description: Flex Shape の OCPU 数
     minimum: 1
     maximum: 64
     default: 2
@@ -1142,9 +1132,9 @@ variables:
           - VM.Standard3.Flex
     required: true
   instance_pool_ocpus_denseIO_flex:
-    title: Cores
+    title: コア数
     type: enum
-    description: Number of OCPU's for Dense IO flex shape
+    description: Dense IO Flex Shape の OCPU 数
     enum:
     - 8
     - 16
@@ -1161,7 +1151,7 @@ variables:
           - VM.DenseIO.E5.Flex
     required: true
   instance_pool_custom_memory:
-    title: Use custom memory size
+    title: カスタムメモリサイズを使用
     type: boolean
     default: true
     visible:
@@ -1191,9 +1181,9 @@ variables:
           - ${instance_pool_shape}
           - VM.Standard3.Flex
   instance_pool_memory:
-    title: Memory in GBS
+    title: メモリサイズ (GB)
     type: integer
-    description: Number of memory for flex shape. Minimum 1GB per core.
+    description: Flex Shape のメモリサイズ。コアあたり最低 1GB。
     minimum: 1
     maximum: 1024
     default: 16
@@ -1231,30 +1221,30 @@ variables:
     required: true
     type: integer
     minimum: 0
-    title: Initial cluster size
+    title: 初期クラスタサイズ
     default: 0
-    description: Number of Compute Instances (Permanent Cluster when autoscaling)
+    description: Compute Instance 数（Autoscaling 時は Permanent Cluster）
   hyperthreading:
     type: boolean
-    title: Hyperthreading enabled
+    title: Hyperthreading を有効化
     default: false
-    description: When unchecked SMT will be disabled
+    description: チェックを外すと SMT が無効になります
   boot_volume_size:
     type: integer
     required: true
     minimum: 50
-    title: Size of the boot volume in GB
+    title: Boot Volume サイズ (GB)
     default: 100
-    description: Boot volume size in GB of each compute node
+    description: 各 Compute node の Boot Volume サイズ (GB)
   use_marketplace_image:
     type: boolean
-    title: use marketplace image
-    description: Use marketplace image, otherwise provide custom image OCID
+    title: Marketplace Image を使用
+    description: Marketplace Image を使用します。使用しない場合は Custom Image OCID を指定します
     default: true
   marketplace_listing:
     type: enum
-    title: Image version
-    description: Marketplace listing to use
+    title: Image バージョン
+    description: 使用する Marketplace リスティング
     required: true
     enum:
     - HPC_OL7
@@ -1267,15 +1257,14 @@ variables:
     visible: ${use_marketplace_image}
   use_compute_agent:
     type: boolean
-    title: use compute agent
-    description: Select if your image has the OCA agent rather than the oci-cn-auth
-      package. The new marketplace images need the compute agent enabled.
+    title: Compute Agent を使用
+    description: Image に oci-cn-auth package ではなく OCA agent が含まれている場合に選択します。新しい Marketplace Image では Compute Agent を有効にする必要があります。
     default: true
     visible:
       not:
       - ${use_marketplace_image}
   compute_image_compartment:
-    title: compute image compartment
+    title: Compute Image コンパートメント
     type: oci:identity:compartment:id
     default: ${targetCompartment}
     visible:
@@ -1286,8 +1275,7 @@ variables:
         - ${unsupported}
   image:
     title: Image
-    description: Custom image ID for compute nodes. Supported OS are OL7, OL8, CentOS7
-      and Ubuntu 20.04
+    description: compute node の Custom Image ID。サポートされる OS は OL7、OL8、CentOS7、Ubuntu 20.04 です
     type: oci:core:image:id
     required: true
     dependsOn:
@@ -1299,8 +1287,8 @@ variables:
       - not:
         - ${unsupported}
   compute_username:
-    title: Default username for compute hosts
-    description: Custom image ID for compute hosts
+    title: Compute host のデフォルトユーザー名
+    description: Compute host の Custom Image ID
     type: string
     default: opc
     visible:
@@ -1308,8 +1296,8 @@ variables:
       - not:
         - ${use_marketplace_image}
   unsupported:
-    title: Use unsupported image
-    description: Custom image ID for compute nodes
+    title: サポート対象外 Image を使用
+    description: compute node の Custom Image ID
     type: boolean
     default: false
     visible:
@@ -1318,8 +1306,7 @@ variables:
         - ${use_marketplace_image}
   image_ocid:
     title: Image OCID
-    description: Custom image ID for compute nodes. Supported OS are OL7, OL8, CentOS7
-      and Ubuntu 20.04
+    description: compute node の Custom Image ID。サポートされる OS は OL7、OL8、CentOS7、Ubuntu 20.04 です
     type: string
     required: true
     visible:
@@ -1329,39 +1316,36 @@ variables:
       - and:
         - ${unsupported}
   BIOS:
-    title: Modify BIOS options
-    description: 'WARNING : Do NOT change those if you have not tested the changes
-      on a single instance. Error will be "Shape does not support the provided platform
-      configuration" '
+    title: BIOS オプションを変更
+    description: '警告: 単一インスタンスで変更をテストしていない場合は変更しないでください。エラーは "Shape does not support the provided platform configuration" になります。'
     type: boolean
     default: false
     visible: true
   IOMMU:
-    title: IOMMU enabled
+    title: IOMMU を有効化
     type: boolean
     default: false
     visible: ${BIOS}
   SMT:
-    title: SMT Enabled
+    title: SMT を有効化
     type: boolean
     default: true
     visible: ${BIOS}
   virt_instr:
-    title: Virtualization instructions
-    description: Virtualization instructions include Secure Virtual Machine for AMD
-      shapes or VT-x for Intel shapes
+    title: 仮想化命令
+    description: 仮想化命令には AMD shapes の Secure Virtual Machine または Intel shapes の VT-x が含まれます
     type: boolean
     default: false
     visible: ${BIOS}
   access_ctrl:
     title: Access Control Service
-    description: Access control service lets the platform enforce PCIe device isolation
+    description: Access Control Service により、platform が PCIe device isolation を強制できます
     type: boolean
     default: false
     visible: ${BIOS}
   numa_nodes_per_socket:
-    title: Numa Node per Socket
-    description: NUMA Settings
+    title: NUMA Node per Socket
+    description: NUMA 設定
     type: enum
     enum:
     - Default
@@ -1372,8 +1356,8 @@ variables:
     default: Default
     visible: ${BIOS}
   percentage_of_cores_enabled:
-    title: Numa Node per Socket
-    description: NUMA Settings
+    title: NUMA Node per Socket
+    description: NUMA 設定
     type: enum
     enum:
     - Default
@@ -1385,20 +1369,20 @@ variables:
     visible: ${BIOS}
   use_advanced:
     type: boolean
-    title: Show advanced storage options
+    title: ストレージ詳細オプションを表示
     default: false
-    description: Including running home on FSS.
+    description: /home を FSS で実行する設定を含みます。
     visible: true
   use_scratch_nfs:
     type: boolean
-    title: Shared NFS scratch space from NVME or Block volume
+    title: NVMe または Block Volume から NFS scratch space を共有
     visible:
       and:
       - ${use_advanced}
     default: false
   scratch_nfs_type_cluster:
     type: enum
-    title: Scratch storage configuration
+    title: Scratch storage 設定
     enum:
     - none
     - nvme
@@ -1412,7 +1396,7 @@ variables:
     required: true
   scratch_nfs_type_pool:
     type: enum
-    title: Scratch storage configuration
+    title: Scratch storage 設定
     enum:
     - none
     - block
@@ -1428,7 +1412,7 @@ variables:
   cluster_block_volume_size:
     required: true
     type: integer
-    title: Size of the additional volume in GB
+    title: 追加 Volume サイズ (GB)
     default: 1000
     visible:
       and:
@@ -1453,7 +1437,7 @@ variables:
               - ${use_advanced}
   cluster_block_volume_performance:
     type: enum
-    title: Block volume performance
+    title: Block Volume パフォーマンス
     required: true
     enum:
     - 0.  Lower performance
@@ -1482,8 +1466,8 @@ variables:
               - ${use_scratch_nfs}
               - ${use_advanced}
   scratch_nfs_path:
-    title: NFS scratch space mount point
-    description: Path to NFS share
+    title: NFS scratch space マウントポイント
+    description: NFS 共有へのパス
     default: /nfs/scratch
     required: true
     type: string
@@ -1493,19 +1477,16 @@ variables:
       - ${use_scratch_nfs}
   private_deployment:
     type: boolean
-    title: Deploy Master Node without a public IP
-    description: Deploy with no Public IP for the master node. 'Master Node Subnet'
-      must be a Private subnet. This will require the creation of a controller service,
-      VPN or FastConnect to connect via ssh to the master node
+    title: Public IP なしで Master Node をデプロイ
+    description: Master Node に Public IP を付与せずにデプロイします。'Master Node Subnet' は Private Subnet である必要があります。Master Node に SSH 接続するには controller service、VPN、または FastConnect の作成が必要です
     default: false
   use_existing_vcn:
     type: boolean
-    title: Use Existing VCN
-    description: 'Use existing VCN or create new one. If true, make sure the security
-      lists are correctly set in the subnets (ex: Open traffic within VCN)'
+    title: 既存 VCN を使用
+    description: '既存 VCN を使用するか、新しい VCN を作成します。true の場合は、Subnet の Security List が正しく設定されていることを確認してください（例: VCN 内のトラフィックを許可）'
     default: false
   vcn_compartment:
-    title: VCN compartment
+    title: VCN コンパートメント
     type: oci:identity:compartment:id
     visible: ${use_existing_vcn}
     default: ${targetCompartment}
@@ -1515,7 +1496,7 @@ variables:
     visible:
       and:
       - ${use_existing_vcn}
-    title: Existing network
+    title: 既存 Network
     default: ''
     required: true
     dependsOn:
@@ -1539,13 +1520,13 @@ variables:
     visible: ${use_existing_vcn}
     required: true
   dns_entries:
-    title: DNS entry
+    title: DNS エントリ
     type: boolean
     default: true
-    description: Only available for a private zone
+    description: Private Zone でのみ使用できます
   zone_name:
-    title: Private Zone Name
-    description: The zone needs to be private for the stack to be able to add entries
+    title: Private Zone 名
+    description: stack が entry を追加できるようにするには、Zone が Private である必要があります
     type: string
     visible:
       and:
@@ -1554,7 +1535,7 @@ variables:
     required: ${dns_entries}
   vcn_subnet:
     type: string
-    title: VCN IP range
+    title: VCN IP 範囲
     description: VCN subnet
     default: 172.16.0.0/21
     required: true
@@ -1563,159 +1544,140 @@ variables:
       - ${use_existing_vcn}
   public_subnet:
     type: string
-    title: Master Node subnet IP range
+    title: Master Node Subnet IP 範囲
     default: 172.16.0.0/24
-    description: Must be within VCN subnet
+    description: VCN subnet 内である必要があります
     required: true
     visible:
       not:
       - ${use_existing_vcn}
   additional_subnet:
     type: string
-    title: Additional subnet IP range
+    title: 追加 Subnet IP 範囲
     default: 172.16.1.0/24
-    description: Must be within VCN subnet
+    description: VCN subnet 内である必要があります
     required: true
     visible:
       not:
       - ${use_existing_vcn}
   rdma_subnet:
     type: string
-    title: RDMA subnet IP range
+    title: RDMA Subnet IP 範囲
     default: 10.224.0.0/12
-    description: Must be at least the same size as private subnet for HPC and at least
-      16 times the size of the private subnet for GPUs, currently cannnot be modified
-      with the compute agent
+    description: HPC では Private Subnet と同じサイズ以上、GPU では Private Subnet の 16 倍以上のサイズが必要です。現在 Compute Agent では変更できません
     required: true
   private_subnet:
     type: string
-    title: Private subnet IP range
+    title: Private Subnet IP 範囲
     default: 172.16.4.0/22
-    description: Must be within VCN subnet
+    description: VCN subnet 内である必要があります
     required: true
     visible:
       not:
       - ${use_existing_vcn}
   ssh_cidr:
     type: string
-    title: Initial CIDR range allowed to SSH
+    title: SSH を許可する初期 CIDR 範囲
     default: 0.0.0.0/0
-    description: Allowed SSH network in CIDR notation
+    description: CIDR 表記で指定する許可 SSH network
     required: true
   slurm:
     type: boolean
-    title: Install SLURM
+    title: SLURM をインストール
     default: true
-    description: Needed for autoscaling
+    description: Autoscaling に必要です
   slurm_nfs:
     type: boolean
-    title: Share spool directory
+    title: spool directory を共有
     default: false
-    description: Install Slurm spool directory on user NFS
+    description: Slurm spool directory を user NFS にインストールします
     visible:
       and:
       - ${slurm}
       - ${add_nfs}
   use_ood:
     type: boolean
-    title: Install Open OnDemand
+    title: Open OnDemand をインストール
     default: false
-    description: Open OnDemand is a web-based platform that provides secure, browser-based
-      access to HPC resources, enabling users to run applications, manage files, and
-      submit jobs without needing direct SSH access.
+    description: Open OnDemand は、HPC resources へのセキュアなブラウザベースアクセスを提供する Web ベース platform です。ユーザーは直接 SSH access せずに application の実行、file 管理、job 投入を行えます。
   slurm_ha:
     type: boolean
-    title: Create a back-up Slurm Controller
+    title: バックアップ Slurm Controller を作成
     default: false
     required: true
-    description: Add a second master of the same shape as the controller as a back-up
-      controller node. We recommend using a FSS to save the state and share between
-      masters
+    description: controller と同じ Shape の 2 台目の master をバックアップ controller node として追加します。state の保存と master 間の共有には FSS の使用を推奨します
     visible: ${slurm}
   pyxis:
     type: boolean
-    title: Install Nvidia Pyxis plugin for Slurm
+    title: Slurm 用 Nvidia Pyxis plugin をインストール
     default: false
-    description: 'Install Pyxis. Pyxis is a plugin that integrates Enroot with Slurm.
-      (Warning: using Pyxis with autoscaling is causing an issue that prevents jobs
-      from being scheduled on nodes to be spun up)'
+    description: 'Pyxis をインストールします。Pyxis は Enroot を Slurm と統合する plugin です。（警告: Pyxis を autoscaling と併用すると、起動対象の node に job がスケジュールされない問題が発生します）'
     visible:
       and:
       - ${slurm}
       - ${enroot}
   rack_aware:
     type: boolean
-    title: Create Rack aware topology
+    title: rack aware topology を作成
     default: false
     required: true
-    description: "Slurm topology can define rack aware topologies to prioritize nodes\
-      \ on same racks per job.\n This is a LA feature and your tenancy needs to be\
-      \ whitelisted"
+    description: Slurm topology では、job ごとに同一 rack 上の node を優先する rack aware topology を定義できます。この機能は LA feature であり、tenancy の whitelist 登録が必要です
     visible: ${slurm}
   queue:
     type: String
-    title: Queue Name
+    title: Queue 名
     default: compute
     required: true
-    description: Add the permanent cluster to a specific queue, compute is the default
-      queue
+    description: permanent cluster を特定の queue に追加します。デフォルト queue は compute です
     visible: ${slurm}
   spack:
     type: boolean
-    title: Install Spack package manager
+    title: Spack package manager をインストール
     default: false
-    description: Install Spack package manager. Requires shared folder
+    description: Spack package manager をインストールします。shared folder が必要です
   enroot:
     type: boolean
-    title: Install Nvidia Enroot for containerized GPU workloads
+    title: コンテナ化 GPU workload 用 Nvidia Enroot をインストール
     default: false
-    description: Install Enroot, Nvidia Container Toolkit, and docker.
+    description: Enroot、Nvidia Container Toolkit、docker をインストールします。
     visible: ${slurm}
   pam:
     type: boolean
-    title: Enable PAM
+    title: PAM を有効化
     default: false
-    description: Enable PAM for the Slurm cluster (Supported on OL with RHCK kernel
-      and Ubuntu at this time). When PAM is enabled, users that are not in the sudo
-      group will not be able to SSH into the compute nodes unless they have an active
-      job running in Slurm.
+    description: Slurm cluster で PAM を有効化します（現時点では RHCK kernel の OL と Ubuntu でサポート）。PAM が有効な場合、sudo group に属していないユーザーは Slurm で実行中の active job がない限り compute node に SSH できません。
     visible: ${slurm}
   sacct_limits:
     type: boolean
-    title: Enable Limits for Slurm jobs
+    title: Slurm job の Limits を有効化
     default: false
-    description: Enable Limits for the Slurm cluster When enabled, users will not
-      be able to submit jobs if the right limits are not set
+    description: Slurm cluster の Limits を有効化します。有効化すると、適切な limits が設定されていない場合にユーザーは job を投入できません
     visible: ${slurm}
   healthchecks:
     type: boolean
-    title: Turn on Healthchecks for GPU nodes
+    title: GPU node の Healthcheck を有効化
     default: false
-    description: Will run tests on GPU nodes before starting a job. Nodes that are
-      showing issues will be set in drain state
+    description: job 開始前に GPU node で test を実行します。問題がある node は drain state に設定されます
     visible: ${slurm}
   monitoring:
     type: boolean
-    title: Install HPC Cluster Monitoring Tools
+    title: HPC Cluster Monitoring Tools をインストール
     default: false
-    description: Install Grafana, Telegrapf, and InfluxDB tools for system monitoring.
+    description: system monitoring 用に Grafana、Telegrapf、InfluxDB tools をインストールします。
   autoscaling:
     type: boolean
-    title: Scheduler based autoscaling
+    title: Scheduler ベース Autoscaling
     default: true
-    description: Requires SLURM installation. Scheduler will launch new clusters based
-      on job requirements
+    description: SLURM のインストールが必要です。Scheduler は job requirements に基づいて新しい cluster を起動します
   latency_check:
     type: boolean
     title: RDMA Latency check
     default: true
-    description: Verify RDMA connection for Cluster Networks of HPC and Optimized
-      shapes during autoscaling
+    description: autoscaling 中に HPC および Optimized shapes の Cluster Networks で RDMA connection を検証します
   inst_prin:
     type: boolean
-    title: Use Instance Principal instead of configuration file
-    description: You will need to set a dynamic group and policy to allow the controller
-      to authenticate. This will not be created automatically.
+    title: configuration file の代わりに Instance Principal を使用
+    description: controller が認証できるように Dynamic Group と Policy を設定する必要があります。これは自動作成されません。
     default: true
   api_user_key:
     type: file
@@ -1743,25 +1705,24 @@ variables:
     required: true
   configure:
     type: boolean
-    title: Configure system
+    title: システムを構成
     default: true
-    description: If unchecked, cluster will be launched but left unconfigured
+    description: チェックを外すと、cluster は起動されますが未構成のままになります
   add_nfs:
     type: boolean
-    title: Add another NFS filesystem
+    title: 別の NFS ファイルシステムを追加
     default: false
-    description: For FSS, leave options filed empty. Do not mount /home from here.
-      There is a flag to do that in the Advanced Storage Options.
+    description: FSS の場合は options 欄を空のままにしてください。ここから /home をマウントしないでください。ストレージ詳細オプションにそのためのフラグがあります。
     visible: true
   create_fss:
     type: boolean
-    title: Create FSS
+    title: FSS を作成
     default: false
-    description: For FSS, leave options filed empty.
+    description: FSS の場合は options 欄を空のままにしてください。
     visible: ${add_nfs}
   mount_target_count:
-    title: Number of FSS mount targets
-    description: Number of FSS Mount Target to use with File System
+    title: FSS Mount Target 数
+    description: File System で使用する FSS Mount Target の数
     type: integer
     default: 1
     required: true
@@ -1770,8 +1731,8 @@ variables:
       - ${add_nfs}
       - ${create_fss}
   fss_compartment:
-    title: FSS compartment
-    description: Compartment to add the FSS Mount Target and File System
+    title: FSS コンパートメント
+    description: FSS Mount Target と File System を追加するコンパートメント
     type: oci:identity:compartment:id
     default: ${targetCompartment}
     required: true
@@ -1807,24 +1768,24 @@ variables:
     required: true
   localdisk:
     type: boolean
-    title: Mount Localdisk
+    title: Localdisk をマウント
     default: true
-    description: For nodes using a NVMe, mount the localdisk
+    description: NVMe を使用する node で localdisk をマウントします
     visible: ${use_advanced}
   log_vol:
     type: boolean
-    title: One Logical Volume
+    title: 1 つの Logical Volume
     default: true
-    description: Mount all NVMe's as one logical volume
+    description: すべての NVMe を 1 つの logical volume としてマウントします
     visible:
       and:
       - ${use_advanced}
       - ${localdisk}
   redundancy:
     type: boolean
-    title: Redundancy
+    title: 冗長性
     default: true
-    description: Use RAID for redundancy
+    description: 冗長性のために RAID を使用します
     visible:
       and:
       - ${use_advanced}
@@ -1834,7 +1795,7 @@ variables:
     type: string
     title: NFS Path
     default: /share
-    description: Value of the path on which you can mount the drive
+    description: ドライブをマウントできるパスの値
     visible:
       and:
       - ${add_nfs}
@@ -1844,7 +1805,7 @@ variables:
     title: NFS server IP
     default: 0.0.0.0
     required: true
-    description: IP address of the NFS server
+    description: NFS server の IP アドレス
     visible:
       and:
       - ${add_nfs}
@@ -1854,14 +1815,14 @@ variables:
     type: string
     title: NFS server Path
     default: /share
-    description: Value of the path on the NFS server
+    description: NFS server 上のパスの値
     visible: ${add_nfs}
     required: true
   nfs_options:
     type: string
-    title: Options
+    title: オプション
     default: ''
-    description: Mount options, FSS requires empty string
+    description: マウントオプション。FSS では空文字列が必要です
     visible:
       and:
       - ${add_nfs}
@@ -1878,7 +1839,7 @@ variables:
       - ${autoscaling_mysql_service}
   admin_username:
     type: string
-    title: MySQL Monitoring username
+    title: MySQL Monitoring ユーザー名
     default: admin
     required: true
     description: ''
@@ -1886,7 +1847,7 @@ variables:
       and:
       - ${autoscaling_mysql_service}
   admin_password:
-    title: MySQL Monitoring password
+    title: MySQL Monitoring パスワード
     default: Monitor1234!
     description: ''
     visible:
@@ -1895,7 +1856,7 @@ variables:
     required: true
   autoscaling_monitoring:
     type: boolean
-    title: Monitor the autoscaling
+    title: autoscaling を監視
     default: false
     description: ''
     visible:
@@ -1903,21 +1864,21 @@ variables:
       - ${autoscaling}
   autoscaling_mysql_service:
     type: boolean
-    title: Create a Mysql Service
+    title: MySQL Service を作成
     default: false
-    description: false will use the controller as mysqlDB
+    description: false の場合は controller を MySQL DB として使用します
     visible:
       and:
       - ${autoscaling}
       - ${autoscaling_monitoring}
   privilege_sudo:
     type: boolean
-    title: Sudo Access
+    title: sudo access
     default: true
-    description: Give sudo access to the privilege group
+    description: privilege group に sudo access を付与します
   privilege_group_name:
     type: string
-    title: Name of the group with privileges
+    title: privilege を持つ group 名
     default: privilege
     required: true
     visible:
@@ -1927,17 +1888,18 @@ variables:
     type: boolean
     title: Login Node
     default: false
-    description: Create an additional login node for users
+    description: ユーザー用の追加 Login Node を作成します
   login_ad:
     type: oci:identity:availabilitydomain:name
     dependsOn:
       compartmentId: ${targetCompartment}
     visible: ${login_node}
     required: true
-    description: Availability Domain for login node
-    title: Availability Domain For Login Node
+    description: Login Node の Availability Domain
+    title: Login Node の Availability Domain
     default: ${ad}
   login_shape:
+    title: Login Node Shape
     type: oci:core:instanceshape:name
     dependsOn:
       compartmentId: ${targetCompartment}
@@ -1945,8 +1907,9 @@ variables:
     default: VM.Standard.E4.Flex
     visible: ${login_node}
   login_ocpus:
+    title: コア数
     type: integer
-    description: Number of OCPU's for flex shape
+    description: Flex Shape の OCPU 数
     minimum: 1
     maximum: 64
     default: 16
@@ -1977,9 +1940,9 @@ variables:
       - ${login_node}
     required: true
   login_ocpus_denseIO_flex:
-    title: Cores
+    title: コア数
     type: enum
-    description: Number of OCPU's for Dense IO flex shape
+    description: Dense IO Flex Shape の OCPU 数
     enum:
     - 8
     - 16
@@ -1997,7 +1960,7 @@ variables:
       - ${login_node}
     required: true
   login_custom_memory:
-    title: Use custom memory size
+    title: カスタムメモリサイズを使用
     type: boolean
     default: false
     visible:
@@ -2026,9 +1989,9 @@ variables:
           - VM.Standard3.Flex
       - ${login_node}
   login_memory:
-    title: Memory in GBS
+    title: メモリサイズ (GB)
     type: integer
-    description: Number of memory for flex shape. Minimum 1GB per core.
+    description: Flex Shape のメモリサイズ。コアあたり最低 1GB。
     minimum: 1
     maximum: 1024
     default: 128
@@ -2065,18 +2028,18 @@ variables:
     type: integer
     required: true
     minimum: 50
-    title: Size of the boot volume in GB
+    title: Boot Volume サイズ (GB)
     default: 250
     visible: ${login_node}
   login_block:
     type: boolean
-    title: Additional block volume for login node
+    title: Login Node 用の追加 Block Volume
     default: false
     visible: ${login_node}
   login_block_volume_size:
     required: true
     type: integer
-    title: Size of the additional volume in GB
+    title: 追加 Volume サイズ (GB)
     default: 1000
     visible:
       and:
@@ -2085,7 +2048,7 @@ variables:
         - ${login_node}
   login_block_volume_performance:
     type: enum
-    title: Block volume performance
+    title: Block Volume パフォーマンス
     required: true
     enum:
     - 0.  Lower performance
@@ -2098,8 +2061,8 @@ variables:
         - ${login_block}
         - ${login_node}
   unsupported_login:
-    title: Use unsupported image
-    description: Custom image ID for Login Node
+    title: サポート対象外 Image を使用
+    description: Login Node の Custom Image ID
     type: boolean
     default: false
     visible:
@@ -2108,7 +2071,7 @@ variables:
       - not:
         - ${use_marketplace_image_login}
   login_image_compartment:
-    title: login image compartment
+    title: Login Node Image コンパートメント
     type: oci:identity:compartment:id
     default: ${targetCompartment}
     visible:
@@ -2120,9 +2083,8 @@ variables:
         - ${use_marketplace_image_login}
     required: true
   custom_login_image:
-    title: Login Image ID
-    description: 'Custom image ID for login nodes. Please note that only Oracle Linux
-      and Ubuntu 20.04 are supported as login image at this moment. '
+    title: Login Node Image ID
+    description: 'Login Node の Custom Image ID。現時点では login Image として Oracle Linux と Ubuntu 20.04 のみがサポートされています。'
     type: oci:core:image:id
     dependsOn:
       compartmentId: ${login_image_compartment}
@@ -2136,7 +2098,7 @@ variables:
     required: true
   unsupported_login_image:
     title: Image OCID
-    description: Custom image ID for login nodes
+    description: Login Node の Custom Image ID
     type: string
     required: true
     visible:
@@ -2146,22 +2108,22 @@ variables:
         - ${use_marketplace_image_login}
     default: image.ocid
   login_username:
-    title: Default username for login node
-    description: Custom image ID for login node
+    title: Login Node のデフォルトユーザー名
+    description: Login Node の Custom Image ID
     type: string
     default: opc
     required: true
     visible: ${login_node}
   use_marketplace_image_login:
     type: boolean
-    title: use marketplace image
-    description: Use marketplace image, otherwise provide custom image OCID
+    title: Marketplace Image を使用
+    description: Marketplace Image を使用します。使用しない場合は Custom Image OCID を指定します
     default: true
     visible: ${login_node}
   marketplace_listing_login:
     type: enum
-    title: Image version
-    description: Marketplace listing to use
+    title: Image バージョン
+    description: 使用する Marketplace リスティング
     required: true
     enum:
     - HPC_OL7
