@@ -4,6 +4,8 @@
     package_name:
       - "@Server with GUI"
     package_state: present
+    package_exclude:
+      - "kernel*"
   include_role:
     name: safe_yum
 
