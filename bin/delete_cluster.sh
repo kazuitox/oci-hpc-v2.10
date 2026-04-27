@@ -50,7 +50,7 @@ else
   fi
   i=0
   echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
-  terraform destroy -auto-approve -parallelism 5 >> $logs_folder/delete_${cluster_id}.log 2>&1
+  terraform destroy -auto-approve -parallelism 1 >> $logs_folder/delete_${cluster_id}.log 2>&1
   status_terraform_deletion=$?
   while [ $i -lt 5 ] && [ $status_terraform_deletion -ne 0 ]
   do
