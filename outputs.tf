@@ -13,3 +13,7 @@ output "backup" {
 output "login" {
   value = var.login_node ? local.host_login : "No Login Node Defined"
 }
+
+output "ood_opc_password" {
+  value = nonsensitive(random_password.ood_opc_password.result)
+}

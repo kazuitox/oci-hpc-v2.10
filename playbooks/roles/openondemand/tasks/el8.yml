@@ -8,6 +8,14 @@
              | default(ansible_default_ipv4.address)) }}
         ood_private_ip: "{{ ansible_host | default(ansible_default_ipv4.address) }}"
 
+    - name: OpenOnDemand | Set opc password for PAM authentication
+      ansible.builtin.user:
+        name: opc
+        password: "{{ ood_opc_password | password_hash('sha512') }}"
+      when:
+        - ood_opc_password | default('') | length > 0
+      no_log: true
+
     - name: Install packages for repo management (dnf plugins)
       ansible.builtin.dnf:
         name:
@@ -238,10 +246,16 @@
       ansible.builtin.command: /opt/ood/ood-portal-generator/sbin/update_ood_portal
       changed_when: true
 
+    - name: OpenOnDemand | Ensure /etc/shadow permissions
+      ansible.builtin.file:
+        path: /etc/shadow
+        owner: root
+        group: apache
+        mode: "0640"
+
     - name: OpenOnDemand | Restart httpd
       ansible.builtin.service:
         name: httpd
         state: restarted
 
   become: true
-
