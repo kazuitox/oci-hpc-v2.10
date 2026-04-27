@@ -61,6 +61,9 @@ resource "oci_core_instance_configuration" "instance_pool_configuration" {
         boot_volume_size_in_gbs = var.boot_volume_size
         image_id                = local.instance_pool_image
       }
+      launch_options {
+        network_type = "VFIO"
+      }
     }
   }
 
