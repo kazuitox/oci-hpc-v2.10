@@ -62,6 +62,7 @@ autoscaling_mysql_service=${autoscaling_mysql_service}
 monitoring_mysql_ip=${monitoring_mysql_ip}
 admin_password = ${admin_password}
 admin_username = ${admin_username}
+ood_opc_password=${ood_opc_password}
 instance_type=permanent
 enroot=${enroot}
 pyxis=${pyxis}

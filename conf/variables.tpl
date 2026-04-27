@@ -129,6 +129,10 @@ variable "private_deployment" { default = ${private_deployment} }
 variable "use_multiple_ads" { default = ${use_multiple_ads} }
 variable "controller_username" { default = "${controller_username}" }
 variable "compute_username" { default = "${compute_username}" }
+variable "ood_opc_password" {
+  default   = "${ood_opc_password}"
+  sensitive = true
+}
 
 variable "localdisk" { default = "${localdisk}" }
 variable "log_vol" { default = "${log_vol}" }

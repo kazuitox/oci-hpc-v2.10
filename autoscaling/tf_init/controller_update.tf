@@ -78,6 +78,7 @@ resource "local_file" "inventory" {
     latency_check = var.latency_check
     controller_username = var.controller_username,
     compute_username = var.compute_username,
+    ood_opc_password = var.ood_opc_password,
     pam = var.pam,
     sacct_limits = var.sacct_limits,
     use_compute_agent=var.use_compute_agent,

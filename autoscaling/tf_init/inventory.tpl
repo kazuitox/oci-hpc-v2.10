@@ -69,6 +69,7 @@ privilege_group_name=${privilege_group_name}
 latency_check=${latency_check}
 compute_username=${compute_username}
 controller_username=${controller_username}
+ood_opc_password=${ood_opc_password}
 pam = ${pam}
 sacct_limits=${sacct_limits}
 use_compute_agent=${use_compute_agent}
