@@ -34,9 +34,29 @@ variable "cluster_network_shape" { default = "BM.Optimized3.36" }
 variable "instance_pool_shape" { default = "VM.Standard.E6.Flex" }
 variable "node_count" { default = 0 }
 variable "boot_volume_size" { default = 100 }
-variable "use_marketplace_image" { default = true}
+variable "use_marketplace_image" { default = false }
 variable "image" { default = "ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa" }
 variable "image_ocid" { default = "ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa" }
+variable "import_compute_image_from_object_storage" {
+  type    = bool
+  default = true
+}
+variable "compute_image_source_uri" {
+  type    = string
+  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/6nU_I2O66fcnVuaA0m6QOrvGMBHO1h2gOmDBeAi9seD9FPNwNIq5KnbuAi4qMVhY/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-image-v1.0"
+}
+variable "compute_image_display_name" {
+  type    = string
+  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-image-v1.0"
+}
+variable "compute_image_operating_system" {
+  type    = string
+  default = "Oracle Linux"
+}
+variable "compute_image_operating_system_version" {
+  type    = string
+  default = "8.10"
+}
 variable "use_compute_agent" { default = true }
 variable "unsupported_controller_image" { default = "" }
 variable "unsupported_login_image" { default = "" }
