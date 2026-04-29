@@ -15,7 +15,7 @@ resource "oci_core_instance" "backup" {
     oci_identity_policy.compute_management_autoscaling_policy,
     oci_identity_policy.autoscaling_policy,
   ]
-  availability_domain = var.controller_ad
+  availability_domain = local.controller_ad
   compartment_id      = var.targetCompartment
   shape               = var.controller_shape
 

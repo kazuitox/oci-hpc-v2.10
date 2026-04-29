@@ -1,21 +1,21 @@
 resource "oci_file_storage_file_system" "FSS" {
   count               = var.create_fss ? 1 : 0
-  availability_domain = var.fss_ad
-  compartment_id      = var.fss_compartment
+  availability_domain = local.fss_ad
+  compartment_id      = local.fss_compartment
   display_name        = "${local.cluster_name}-fss"
 }
 
 resource "oci_file_storage_file_system" "FSS_home" {
   count               = var.create_fss && var.home_fss ? 1 : 0
-  availability_domain = var.fss_ad
-  compartment_id      = var.fss_compartment
+  availability_domain = local.fss_ad
+  compartment_id      = local.fss_compartment
   display_name        = "${local.cluster_name}-fss-home"
 }
 
 resource "oci_file_storage_mount_target" "FSSMountTarget" {
   count               = var.create_fss ? var.mount_target_count : 0
-  availability_domain = var.fss_ad
-  compartment_id      = var.fss_compartment
+  availability_domain = local.fss_ad
+  compartment_id      = local.fss_compartment
   subnet_id           = local.subnet_id
   display_name        = "${local.cluster_name}-mt-${count.index}"
   hostname_label      = "fileserver${count.index}"

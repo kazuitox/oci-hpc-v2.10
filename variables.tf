@@ -13,7 +13,7 @@ variable "compute_cluster_id" { default = "" }
 variable "compute_cluster_start_index" { default = 0 }
 variable "use_custom_name" { default = false }
 variable "cluster_name" { default = "" }
-variable "controller_ad" {}
+variable "controller_ad" { default = "" }
 variable "controller_shape" { default = "VM.Standard.E5.Flex" }
 variable "controller_object_storage_par" { default = false }
 variable "custom_controller_image" {
