@@ -31,7 +31,8 @@
   gather_facts: true
   roles: 
     - ssh
-    - mpi-hostfiles
+    - firewall
+    - privilege_group
     - boot-volume
 
 - hosts: compute
@@ -45,12 +46,6 @@
   become: true
   gather_facts: true
   tasks: 
-    - include_role: 
-        name: oci-cn-auth
-      when: cluster_network|bool and not use_compute_agent|default(false)|bool
-    - include_role: 
-        name: rdma-interface
-      when: cluster_network|bool and not use_compute_agent|default(false)|bool
     - include_role: 
         name: nvidia_peermem
     - include_role: 
@@ -179,9 +174,6 @@
     - "/opt/oci-hpc/conf/queues.conf"
   tasks:
     - include_role: 
-        name: rack-aware
-      when: rack_aware|default(false)|bool
-    - include_role: 
         name: spack
       when: spack|default(false)|bool
     - include_role: 
@@ -193,3 +185,11 @@
     - include_role: 
         name: telegraf
       when: monitoring|default(false)|bool
+
+- hosts: compute
+  become: true
+  gather_facts: true
+  tasks:
+    - include_role:
+        name: desktop
+      when: use_ood|default(false)|bool

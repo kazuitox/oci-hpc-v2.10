@@ -1,4 +1,4 @@
-i#!/usr/bin/env bash
+#!/usr/bin/env bash
 # ------------------------------------------------------------
 # Switch playbook variant: normal <-> lite  (absolute paths)
 # Usage: ./switch_playbook.sh lite    # to lite
@@ -25,6 +25,7 @@ declare -a PAIRS=(
   "${BASE_DIR}/roles/slurm/tasks/compute.yml:${BASE_DIR}/roles/slurm/tasks/lite_compute.yml"
   "${BASE_DIR}/roles/slurm/tasks/common_pmix.yml:${BASE_DIR}/roles/slurm/tasks/lite_common_pmix.yml"
   "${BASE_DIR}/roles/slurm/tasks/common.yml:${BASE_DIR}/roles/slurm/tasks/lite_common.yml"
+  "${BASE_DIR}/roles/desktop/tasks/el8.yml:${BASE_DIR}/roles/desktop/tasks/lite_el8.yml"
   "${BASE_DIR}/new_nodes.yml:${BASE_DIR}/lite_new_nodes.yml"
 )
 
