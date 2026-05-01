@@ -1,6 +1,6 @@
 resource "oci_core_volume" "controller_volume" { 
   count = var.controller_block ? 1 : 0
-  availability_domain = var.controller_ad
+  availability_domain = local.controller_ad
   compartment_id = var.targetCompartment
   display_name = "${local.cluster_name}-controller-volume"
   
@@ -59,7 +59,7 @@ resource "oci_core_instance" "controller" {
     oci_identity_policy.compute_management_autoscaling_policy,
     oci_identity_policy.autoscaling_policy,
   ]
-  availability_domain = var.controller_ad
+  availability_domain = local.controller_ad
   compartment_id      = var.targetCompartment
   shape               = var.controller_shape
 

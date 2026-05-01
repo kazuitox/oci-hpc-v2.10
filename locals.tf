@@ -14,6 +14,10 @@ locals {
   )
   custom_controller_image_ocid = var.unsupported_controller ? var.unsupported_controller_image : var.custom_controller_image
   custom_login_image_ocid = var.unsupported_login ? var.unsupported_login_image : var.custom_login_image
+  controller_ad = var.controller_ad != "" ? var.controller_ad : var.ad
+  fss_compartment = var.fss_compartment != "" ? var.fss_compartment : var.targetCompartment
+  fss_ad = var.fss_ad != "" ? var.fss_ad : var.ad
+  login_ad = var.login_ad != "" ? var.login_ad : var.ad
 
   shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape
   instance_pool_ocpus = ( local.shape == "VM.DenseIO.E4.Flex" || local.shape == "VM.DenseIO.E5.Flex" ) ? var.instance_pool_ocpus_denseIO_flex : var.instance_pool_ocpus

@@ -1,6 +1,6 @@
 resource "oci_core_volume" "login_volume" { 
   count = var.login_block && var.login_node ? 1 : 0
-  availability_domain = var.login_ad
+  availability_domain = local.login_ad
   compartment_id = var.targetCompartment
   display_name = "${local.cluster_name}-login"
   size_in_gbs = var.login_block_volume_size
@@ -24,7 +24,7 @@ resource "oci_core_instance" "login" {
     oci_identity_policy.compute_management_autoscaling_policy,
     oci_identity_policy.autoscaling_policy,
   ]
-  availability_domain = var.login_ad
+  availability_domain = local.login_ad
   compartment_id      = var.targetCompartment
   shape               = var.login_shape
 

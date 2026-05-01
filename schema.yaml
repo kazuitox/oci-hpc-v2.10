@@ -28,6 +28,8 @@ variableGroups:
   - ${cluster_name}
   - ${fss_compartment}
   - ${fss_ad}
+- title: 計算ノードで利用するインスタンス
+  variables:
   - ${cluster_network}
   - ${cluster_network_shape}
   - ${instance_pool_shape}
@@ -752,7 +754,7 @@ variables:
     required: true
   use_custom_name:
     type: boolean
-    title: クラスタ名を接頭辞(Prefix)を指定
+    title: クラスタ名の接頭辞(Prefix)を指定
     description: クラスタにカスタム名を指定します
     default: true
   ldap:
@@ -773,6 +775,10 @@ variables:
     type: oci:identity:availabilitydomain:name
     dependsOn:
       compartmentId: ${targetCompartment}
+    visible:
+      eq:
+      - ${ui_mode}
+      - ADVANCED
     required: true
     description: controller ホストの Availability Domain
     title: Availability Domain
@@ -1046,7 +1052,7 @@ variables:
       - ${use_cluster_nfs}
     required: true
   cluster_network:
-    title: Cluster Network を使用
+    title: ベアメタルのRoCEv2対応インスタンスを利用
     type: boolean
     description: RoCEv2 Cluster Network を使用します
     default: true
@@ -1789,31 +1795,23 @@ variables:
     default: ${targetCompartment}
     required: true
     visible:
-      or:
+      and:
       - eq:
         - ${ui_mode}
-        - SIMPLE
-      - and:
-        - eq:
-          - ${ui_mode}
-          - ADVANCED
-        - ${add_nfs}
-        - ${create_fss}
+        - ADVANCED
+      - ${add_nfs}
+      - ${create_fss}
   fss_ad:
     type: oci:identity:availabilitydomain:name
     dependsOn:
       compartmentId: ${fss_compartment}
     visible:
-      or:
+      and:
       - eq:
         - ${ui_mode}
-        - SIMPLE
-      - and:
-        - eq:
-          - ${ui_mode}
-          - ADVANCED
-        - ${add_nfs}
-        - ${create_fss}
+        - ADVANCED
+      - ${add_nfs}
+      - ${create_fss}
     default: ${ad}
     description: FSS Availability Domain
     title: FSS Availability Domain
