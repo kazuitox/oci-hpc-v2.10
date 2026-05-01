@@ -3,6 +3,35 @@
   include_tasks: compute_pam.yml
   when: pam|bool
 
+- name: Render systemd units for slurmd
+  become: true
+  template:
+    src: 'systemd/{{ item }}.service'
+    dest: '/lib/systemd/system/{{ item }}.service'
+    backup: "yes"
+  with_items:
+    - slurmd
+  when: ansible_os_family == 'Debian'
+
+- name: Create systemd unit dirs
+  become: true
+  file:
+    name: '/etc/systemd/system/{{ item }}.service.d'
+    state: directory
+  with_items:
+    - munge
+    - slurmd
+
+- name: Render systemd units for slurmd and munge
+  become: true
+  template:
+    src: 'systemd/{{ item }}.service.d/unit.conf.j2'
+    dest: '/etc/systemd/system/{{ item }}.service.d/unit.conf'
+    backup: "yes"
+  with_items:
+    - munge
+    - slurmd
+
 - name: copy munge.key to tmp
   become: true
   shell:
