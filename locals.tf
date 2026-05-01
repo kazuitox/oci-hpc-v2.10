@@ -9,7 +9,9 @@ locals {
   cluster_instances_ids = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.id : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.id : data.oci_core_instance.instance_pool_instances.*.id
   cluster_instances_names = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.display_name : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.display_name : data.oci_core_instance.instance_pool_instances.*.display_name
 
-  image_ocid = var.unsupported ? var.image_ocid : var.image
+  image_ocid = var.import_compute_image_from_object_storage && !var.use_marketplace_image ? oci_core_image.compute_node_custom_image[0].id : (
+    var.unsupported ? var.image_ocid : var.image
+  )
   custom_controller_image_ocid = var.unsupported_controller ? var.unsupported_controller_image : var.custom_controller_image
   custom_login_image_ocid = var.unsupported_login ? var.unsupported_login_image : var.custom_login_image
 

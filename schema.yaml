@@ -2,7 +2,7 @@
 title: HPC クラスタ
 description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
-version: '2026041502'
+version: '2026042701'
 informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
@@ -71,6 +71,9 @@ variableGroups:
   - ${boot_volume_size}
   - ${use_compute_agent}
   - ${use_marketplace_image}
+  - ${import_compute_image_from_object_storage}
+  - ${compute_image_source_uri}
+  - ${compute_image_display_name}
   - ${compute_username}
   - ${marketplace_listing}
   - ${unsupported}
@@ -249,6 +252,8 @@ variableGroups:
   - ${ssh_cidr}
   - ${marketplace_source_images}
   - ${marketplace_version_id}
+  - ${compute_image_operating_system}
+  - ${compute_image_operating_system_version}
   - ${controller_boot_volume_backup_period}
   - ${controller_boot_volume_backup_retention_seconds}
   - ${controller_boot_volume_backup_time_zone}
@@ -1240,7 +1245,47 @@ variables:
     type: boolean
     title: Marketplace Image を使用
     description: Marketplace Image を使用します。使用しない場合は Custom Image OCID を指定します
+    default: false
+  import_compute_image_from_object_storage:
+    type: boolean
+    title: Object Storage URI から Custom Image を登録
+    description: 指定した Object Storage URI を targetCompartment の Custom Image として登録し、その OCID を Compute node に使用します。
     default: true
+    visible:
+      not:
+      - ${use_marketplace_image}
+  compute_image_source_uri:
+    type: string
+    title: Compute Image Source URI
+    description: Custom Image として登録する Object Storage URI
+    required: true
+    default: https://objectstorage.ap-tokyo-1.oraclecloud.com/p/6nU_I2O66fcnVuaA0m6QOrvGMBHO1h2gOmDBeAi9seD9FPNwNIq5KnbuAi4qMVhY/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-image-v1.0
+    visible:
+      and:
+      - not:
+        - ${use_marketplace_image}
+      - ${import_compute_image_from_object_storage}
+  compute_image_display_name:
+    type: string
+    title: Compute Image 表示名
+    description: 登録される Custom Image の表示名
+    required: true
+    default: Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-image-v1.0
+    visible:
+      and:
+      - not:
+        - ${use_marketplace_image}
+      - ${import_compute_image_from_object_storage}
+  compute_image_operating_system:
+    type: string
+    title: Compute Image OS
+    default: Oracle Linux
+    visible: false
+  compute_image_operating_system_version:
+    type: string
+    title: Compute Image OS Version
+    default: '8.10'
+    visible: false
   marketplace_listing:
     type: enum
     title: Image バージョン
@@ -1273,6 +1318,8 @@ variables:
         - ${use_marketplace_image}
       - not:
         - ${unsupported}
+      - not:
+        - ${import_compute_image_from_object_storage}
   image:
     title: Image
     description: compute node の Custom Image ID。サポートされる OS は OL7、OL8、CentOS7、Ubuntu 20.04 です
@@ -1286,6 +1333,8 @@ variables:
         - ${use_marketplace_image}
       - not:
         - ${unsupported}
+      - not:
+        - ${import_compute_image_from_object_storage}
   compute_username:
     title: Compute host のデフォルトユーザー名
     description: Compute host の Custom Image ID
@@ -1304,6 +1353,8 @@ variables:
       and:
       - not:
         - ${use_marketplace_image}
+      - not:
+        - ${import_compute_image_from_object_storage}
   image_ocid:
     title: Image OCID
     description: compute node の Custom Image ID。サポートされる OS は OL7、OL8、CentOS7、Ubuntu 20.04 です
@@ -1313,8 +1364,9 @@ variables:
       and:
       - not:
         - ${use_marketplace_image}
-      - and:
-        - ${unsupported}
+      - ${unsupported}
+      - not:
+        - ${import_compute_image_from_object_storage}
   BIOS:
     title: BIOS オプションを変更
     description: '警告: 単一インスタンスで変更をテストしていない場合は変更しないでください。エラーは "Shape does not support the provided platform configuration" になります。'
