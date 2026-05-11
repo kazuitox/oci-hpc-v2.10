@@ -1,6 +1,7 @@
 variable "region" {}
 variable "tenancy_ocid" {}
 variable "targetCompartment" {}
+variable "create_iam_policy_dynamic_group" { default = true }
 variable "ad" {}
 variable "secondary_ad" { default = "" }
 variable "third_ad" { default = "" }

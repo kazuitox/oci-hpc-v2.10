@@ -1,4 +1,5 @@
 resource "oci_identity_policy" "compute_management_autoscaling_policy" {
+  count          = var.create_iam_policy_dynamic_group ? 1 : 0
   provider       = oci.home
   compartment_id = var.tenancy_ocid
   name           = "Compute-Management-Autoscaling-Policy"
@@ -12,6 +13,7 @@ resource "oci_identity_policy" "compute_management_autoscaling_policy" {
 }
 
 resource "oci_identity_dynamic_group" "autoscaling_dg" {
+  count          = var.create_iam_policy_dynamic_group ? 1 : 0
   provider       = oci.home
   compartment_id = var.tenancy_ocid
   name           = "autoscaling_dg"
@@ -20,14 +22,15 @@ resource "oci_identity_dynamic_group" "autoscaling_dg" {
 }
 
 resource "oci_identity_policy" "autoscaling_policy" {
+  count          = var.create_iam_policy_dynamic_group ? 1 : 0
   provider       = oci.home
   compartment_id = var.tenancy_ocid
   name           = "Autoscaling-Policy"
   description    = "Allows HPC autoscaling instances to manage resources in the tenancy."
 
   statements = [
-    "allow dynamic-group ${oci_identity_dynamic_group.autoscaling_dg.name} to read app-catalog-listing in tenancy",
-    "allow dynamic-group ${oci_identity_dynamic_group.autoscaling_dg.name} to use tag-namespace in tenancy",
-    "allow dynamic-group ${oci_identity_dynamic_group.autoscaling_dg.name} to manage all-resources in tenancy",
+    "allow dynamic-group ${oci_identity_dynamic_group.autoscaling_dg[0].name} to read app-catalog-listing in tenancy",
+    "allow dynamic-group ${oci_identity_dynamic_group.autoscaling_dg[0].name} to use tag-namespace in tenancy",
+    "allow dynamic-group ${oci_identity_dynamic_group.autoscaling_dg[0].name} to manage all-resources in tenancy",
   ]
 }

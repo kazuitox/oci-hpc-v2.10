@@ -23,6 +23,7 @@ variableGroups:
   - ${targetCompartment}
   - ${ad}
   - ${ssh_key}
+  - ${create_iam_policy_dynamic_group}
   - ${controller_ad}
   - ${use_custom_name}
   - ${cluster_name}
@@ -752,6 +753,11 @@ variables:
     title: 公開 SSH キー
     description: 公開 SSH キー
     required: true
+  create_iam_policy_dynamic_group:
+    type: boolean
+    title: Autoscaling 用 IAM Policy / Dynamic Group を作成
+    description: チェックを外すと、このスタックでは Autoscaling 用の Policy と Dynamic Group を作成しません。既存の IAM 設定を利用する場合に無効化します。
+    default: true
   use_custom_name:
     type: boolean
     title: クラスタ名の接頭辞(Prefix)を指定
