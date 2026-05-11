@@ -1,236 +1,131 @@
-<!-- README.md（英語版を既定にする例） -->
-<p align="right">
-  🇯🇵 <a href="README.ja.md">日本語はこちら</a>
-</p>
-
-# Stack to create an HPC cluster. 
+# OCI HPC クラスター構築スタック
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/kazuitox/oci-hpc-v2.10/archive/refs/heads/master.zip)
 
+本リポジトリは、Oracle Cloud Infrastructure (OCI) 上に HPC 環境を短時間で構築し、PoC や初期検証をすばやく開始することを目的としています。
+この目的に合わせて、現時点では Oracle Linux 8 を対象 OS として動作確認しています。その他の OS やバージョンについては未検証のため、利用する場合は個別に検証してください。
 
-## Policies to deploy the stack: 
-```
+Terraform / Oracle Resource Manager スタックとして、コントローラ、計算ノード、Slurm、LDAP、共有ストレージ、Autoscaling、監視、Open OnDemand などをまとめて構成します。
+
+`schema.yaml` は日本語 UI 向けに整備されており、`SIMPLE` モードでは最小限の入力、`ADVANCED` モードでは詳細な構成項目を表示します。
+
+## 主な構成
+
+- コントローラノードを 1 台作成します。
+- 計算ノードは Cluster Network、Compute Cluster、または Instance Pool で作成できます。
+- Slurm をインストールし、ジョブ投入とキュー単位の Autoscaling を構成します。
+- LDAP を有効にした場合、コントローラがクラスター内のユーザー管理を行います。
+- `/home`、クラスター共有領域、scratch 領域を NFS または FSS / Block Volume / NVMe で構成できます。
+- 追加 Login Node、Slurm バックアップコントローラ、Open OnDemand、Spack、Enroot / Pyxis、PAM、Healthcheck、監視をオプションで有効化できます。
+- RDMA NIC メトリックを Object Storage にアップロードするための PAR を作成できます。
+
+## IAM とポリシー
+
+スタックを実行するユーザーは、Administratorsグループに所属していることを想定しており、それによりデフォルトでオートスケーリングの利用に必要なポリシーと動的グループを自動で追加します。
+Administratorグループの権限がない場合には【Autoscaling 用 IAM Policy / Dynamic Group を作成】のチェックを外し、テナント管理者にて以下のポリシーと動的グループを適切に設定をしてください。`
+
+ポリシー1:
+```text
 allow service compute_management to use tag-namespace in tenancy
 allow service compute_management to manage compute-management-family in tenancy
 allow service compute_management to read app-catalog-listing in tenancy
-allow group user to manage all-resources in compartment compartmentName
-```
-## Policies for autoscaling or resizing:
-As described when you specify your variables, if you select instance-principal as way of authenticating your node, make sure your generate a dynamic group and give the following policies to it: 
-```
-Allow dynamic-group instance_principal to read app-catalog-listing in tenancy
-Allow dynamic-group instance_principal to use tag-namespace in tenancy
-```
-And also either:
-
-```
-Allow dynamic-group instance_principal to manage compute-management-family in compartment compartmentName
-Allow dynamic-group instance_principal to manage instance-family in compartment compartmentName
-Allow dynamic-group instance_principal to use virtual-network-family in compartment compartmentName
-Allow dynamic-group instance_principal to use volumes in compartment compartmentName
-```
-or:
-
-`Allow dynamic-group instance_principal to manage all-resources in compartment compartmentName`
-
-
-## Supported OS: 
-The stack allowa various combination of OS. Here is a list of what has been tested. We can't guarantee any of the other combination.
-
-|   Controller  |    Compute   |
-|---------------|--------------|
-|      OL7      |      OL7     |  
-|      OL7      |      OL8     |
-|      OL7      |    CentOS7   |
-|      OL8      |       OL8    |
-|      OL8      |       OL7    |
-| Ubuntu  20.04 | Ubuntu 20.04 |
-
-When switching to Ubuntu, make sure the username is changed from opc to Ubuntu in the ORM for both the controller and compute nodes. 
-## How is resizing different from autoscaling ?
-Autoscaling is the idea of launching new clusters for jobs in the queue. 
-Resizing a cluster is changing the size of a cluster. In some case growing your cluster may be a better idea, be aware that this may lead to capacity errors. Because Oracle CLoud RDMA is non virtualized, you get much better performance but it also means that we had to build HPC islands and split our capacity across different network blocks.
-So while there may be capacity available in the DC, you may not be able to grow your current cluster.  
-
-# Cluster Network Resizing (via resize.sh)
-
-Cluster resizing refers to ability to add or remove nodes from an existing cluster network. Apart from add/remove, the resize.py script can also be used to reconfigure the nodes. 
-
-Resizing of HPC cluster with Cluster Network consist of 2 major sub-steps:
-- Add/Remove node (IaaS provisioning) to cluster – uses OCI Python SDK 
-- Configure the nodes (uses Ansible)
-  -  Configures newly added nodes to be ready to run the jobs
-  -  Reconfigure services like Slurm to recognize new nodes on all nodes
-  -  Update rest of the nodes, when any node/s are removed (eg: Slurm config, /etc/hosts, etc.)
-
-  Cluster created by the autoscaling script can also be resized by using the flag --cluster_name cluster-1-hpc
- 
-## resize.sh usage 
-
-The resize.sh is deployed on the controller node as part of the HPC cluster Stack deployment. Unreachable nodes have been causing issues. If nodes in the inventory are unreachable, we will not do cluster modification to the cluster unless --remove_unreachable is also specified. That will terminate the unreachable nodes before running the action that was requested (Example Adding a node) 
-
-```
-/opt/oci-hpc/bin/resize.sh -h
-usage: resize.sh [-h] [--compartment_ocid COMPARTMENT_OCID]
-                 [--cluster_name CLUSTER_NAME] [--nodes NODES [NODES ...]]
-                 [--no_reconfigure] [--user_logging] [--force] [--remove_unreachable]
-                 [{add,remove,list,reconfigure}] [number]
-
-Script to resize the CN
-
-positional arguments:
-  {add,remove,remove_unreachable,list,reconfigure}
-                        Mode type. add/remove node options, implicitly
-                        configures newly added nodes. Also implicitly
-                        reconfigure/restart services like Slurm to recognize
-                        new nodes. Similarly for remove option, terminates
-                        nodes and implicitly reconfigure/restart services like
-                        Slurm on rest of the cluster nodes to remove reference
-                        to deleted nodes.
-  number                Number of nodes to add or delete if a list of
-                        hostnames is not defined
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --compartment_ocid COMPARTMENT_OCID
-                        OCID of the compartment, defaults to the Compartment
-                        OCID of the localhost
-  --cluster_name CLUSTER_NAME
-                        Name of the cluster to resize. Defaults to the name
-                        included in the controller
-  --nodes NODES [NODES ...]
-                        List of nodes to delete
-  --no_reconfigure      If present. Does not rerun the playbooks
-  --user_logging        If present. Use the default settings in ~/.oci/config
-                        to connect to the API. Default is using
-                        instance_principal
-  --force               If present. Nodes will be removed even if the destroy
-                        playbook failed
-  --ansible_crucial     If present during reconfiguration, only crucial
-                        ansible playbooks will be executed on the live nodes.
-                        Non live nodes will be removed
-  --remove_unreachable  If present, nodes that are not sshable will be terminated 
-                        before running the action that was requested
-                        (Example Adding a node)
-  --quiet               If present, the script will not prompt for a response when 
-                        removing nodes and will not give a reminder to save data 
-                        from nodes that are being removed
-```
-
-**Add nodes** 
-
-Consist of the following sub-steps:
-- Add node (IaaS provisioning) to cluster – uses OCI Python SDK 
-- Configure the nodes (uses Ansible)
-  -  Configures newly added nodes to be ready to run the jobs
-  -  Reconfigure services like Slurm to recognize new nodes on all nodes
-
-Add one node 
-```
-/opt/oci-hpc/bin/resize.sh add 1
-
-```
-
-Add three nodes to cluster compute-1-hpc
-```
-/opt/oci-hpc/bin/resize.sh add 3 --cluster_name compute-1-hpc
-
 ```
 
 
-**Remove nodes** 
-
-Consist of the following sub-steps:
-- Remove node/s (IaaS termination) from cluster – uses OCI Python SDK 
-- Reconfigure rest of the nodes in the cluster  (uses Ansible)
-  -  Remove reference to removed node/s on rest of the nodes (eg: update /etc/hosts, slurm configs, etc.)
- 
-
-Remove specific node:  
-```
-/opt/oci-hpc/bin/resize.sh remove --nodes inst-dpi8e-assuring-woodcock
-```
-or 
-
-Remove a list of nodes (space seperated):  
-```
-/opt/oci-hpc/bin/resize.sh remove --nodes inst-dpi8e-assuring-woodcock inst-ed5yh-assuring-woodcock
-```
-or 
-Remove one node randomly:  
-```
-/opt/oci-hpc/bin/resize.sh remove 1
-```
-or 
-Remove 3 nodes randomly from compute-1-hpc:  
-```
-/opt/oci-hpc/bin/resize.sh remove 3 --cluster_name compute-1-hpc
-
-```
-or 
-Remove 3 nodes randomly from compute-1-hpc but do not prompt for a response when removing the nodes and do not give a reminder to save data 
-from nodes that are being removed :  
-```
-/opt/oci-hpc/bin/resize.sh remove 3 --cluster_name compute-1-hpc --quiet
-
+動的グループ(名前: dynamic-group):
+```text
+Any {instance.compartment.id = '作成した CompartmentID を記入'}
 ```
 
-**Reconfigure nodes** 
+動的グループを利用したポリシー2:
 
-This allows users to reconfigure nodes (Ansible tasks) of the cluster.  
-
-Full reconfiguration of all nodes of the cluster.   This will run the same steps, which are ran when a new cluster is created.   If you manually updated configs which are created/updated as part of cluster configuration, then this command will overwrite your manual changes.   
-
-```
-/opt/oci-hpc/bin/resize.sh reconfigure
+```text
+allow dynamic-group autoscaling_dg to read app-catalog-listing in tenancy
+allow dynamic-group autoscaling_dg to use tag-namespace in tenancy
+allow dynamic-group autoscaling_dg to manage all-resources in tenancy
 ```
 
 
+## OS とイメージ
 
-## Resizing (via OCI console)
-**Things to consider:**  
-- If you resize from OCI console to reduce cluster network/instance pool size(scale down),  the OCI platform decides which node to terminate (oldest node first)
-- OCI console only resizes the Cluster Network/Instance Pool, but it doesn't execute the ansible tasks (HPC Cluster Stack) required to configure the newly added nodes or to update the existing nodes when a node is removed (eg: updating /etc/hosts, slurm config, etc).   
+デフォルトでは、コントローラと Login Node は Marketplace の `HPC_OL8` を使用します。計算ノードは、デフォルトで Object Storage URI から Oracle Linux 8.10 ベースのカスタムイメージを登録して使用する設定です。
 
 
-# Autoscaling
-
-The autoscaling will work in a “cluster per job” approach. This means that for job waiting in the queue, we will launch new cluster specifically for that job. Autoscaling will also take care of spinning down clusters. By default, a cluster is left Idle for 10 minutes before shutting down. Autoscaling is achieved with a cronjob to be able to quickly switch from one scheduler to the next.
-
-Smaller jobs can run on large clusters and the clusters will be resized down after the grace period to only the running nodes. Cluster will NOT be resized up. We will spin up a new larger cluster and spin down the smaller cluster to avoid capacity issues in the HPC island. 
-
-Initial cluster deployed through the stack will never be spun down.
-
-There is a configuration file at `/opt/oci-hpc/conf/queues.conf` with an example at `/opt/oci-hpc/conf/queues.conf.example`to show how to add multiple queues and multiple instance types. Examples are included for HPC, GPU or Flex VMs. 
-
-You will be able to use the instance type name as a feature in the job definition to make sure it runs/create the right kind of node. 
-
-You can only have one default instance-type per queue and one default queue. To submit to a non default queue, either add this line to the SBATCH file: `#SBATCH --partition compute` or in the command line: `sbatch -p queuename job.sh`
-
-The key word `permanent` allows will spin up clusters but not delete them untill it is set to false. It is not needed to reconfigure slurm after you change that value. 
-
-After a modification of the `/opt/oci-hpc/conf/queues.conf`, you need to run 
-`/opt/oci-hpc/bin/slurm_config.sh`
-
-If you have some state that is messing with Slurm, you can make sure it is put back in the initial state with 
-`/opt/oci-hpc/bin/slurm_config.sh --initial`
-
-To turn on autoscaling: 
-Uncomment the line in `crontab -e`:
-```
-* * * * * /opt/oci-hpc/autoscaling/crontab/autoscale_slurm.sh >> /opt/oci-hpc/logs/crontab_slurm.log 2>&1
-```
-And in /etc/ansible/hosts, below value should be true
-```
-autoscaling = true
+```text
+HPC_OL8
 ```
 
-# Submit
-How to submit jobs: 
-Slurm jobs can be submitted as always but a few more constraints can be set: 
-Example in `/opt/oci-hpc/samples/submit/`: 
 
+## 主要な入力項目
+
+| 項目 | 説明 |
+| --- | --- |
+| `ui_mode` | `SIMPLE` または `ADVANCED`。詳細項目を出す場合は `ADVANCED`。 |
+| `cluster_network` | RoCEv2 対応の Cluster Network を使用します。デフォルトは `true`。 |
+| `compute_cluster` | Cluster Network の代わりに Compute Cluster を使用します。 |
+| `node_count` | 初期クラスターの計算ノード数。 |
+| `autoscaling` | Slurm ジョブに応じてクラスターを作成・削除します。デフォルトは `true`。 |
+| `queue` | 初期キュー名。デフォルトは `compute`。 |
+| `ldap` | LDAP を構成します。デフォルトは `true`。 |
+| `home_nfs` / `home_fss` | `/home` の共有方法を選択します。 |
+| `use_cluster_nfs` | クラスター共有領域をコントローラから NFS 共有します。 |
+| `use_scratch_nfs` | scratch 領域を計算ノードから NFS 共有します。 |
+| `private_deployment` | コントローラに Public IP を付与せず、Resource Manager Private Endpoint 経由で構成します。 |
+| `login_node` | ユーザー用の追加 Login Node を作成します。 |
+| `slurm_ha` | バックアップ Slurm Controller を作成します。 |
+| `use_ood` | Open OnDemand をインストールします。 |
+| `monitoring` | Grafana / Telegraf / InfluxDB によるシステム監視を有効化します。 |
+| `autoscaling_monitoring` | Autoscaling の状態を Grafana ダッシュボードで確認できるようにします。 |
+| `controller_object_storage_par` | RDMA NIC メトリックアップロード用の PAR を作成します。 |
+
+## Autoscaling
+
+Autoscaling は「ジョブごとにクラスターを作成する」方式です。Slurm の pending ジョブを cron で確認し、ジョブのノード数、キュー、インスタンスタイプに合わせて新しいクラスターを作成します。アイドル状態のクラスターは、デフォルトで 600 秒経過後に削除対象になります。
+
+既存クラスターのノード数を途中で増減する運用は、非推奨で現状対象外です。現行の cron タスクも、既存クラスターのノード数を変更せず、クラスター単位の作成・削除を行うスクリプトを有効化します。
+
+Autoscaling の設定ファイルはコントローラ上の次のパスに配置されます。
+
+```text
+/opt/oci-hpc/conf/queues.conf
 ```
+
+サンプルはリポジトリ内の次のファイルです。
+
+```text
+conf/queues.conf.example
+```
+
+`queues.conf` では、キューごとに複数の `instance_types` を定義できます。重要な項目は次の通りです。
+
+- `name`: Slurm の constraint として指定するインスタンスタイプ名。
+- `instance_keyword`: 作成されるクラスター名と Slurm ノード名に使う短い識別子。
+- `permanent`: `true` の場合、Autoscaling の削除対象にしません。
+- `max_number_nodes`: キュー / インスタンスタイプ単位の最大ノード数。
+- `max_cluster_size`: 1 クラスターあたりの最大ノード数。
+- `max_cluster_count`: 同時に保持できる最大クラスター数。
+- `cluster_network` / `compute_cluster`: 作成方式を指定します。
+- `ad`: 複数 AD を空白区切りで指定すると、作成失敗時に別 AD を試行します。
+
+設定を変更した後は、Slurm 設定を再生成します。
+
+```bash
+/opt/oci-hpc/bin/slurm_config.sh
+```
+
+Slurm の状態を初期状態に戻したい場合は、次を実行します。
+
+```bash
+/opt/oci-hpc/bin/slurm_config.sh --initial
+```
+
+## ジョブ投入
+
+Slurm ジョブは通常通り `sbatch` で投入できます。`queues.conf` の `instance_types[].name` を constraint に指定すると、そのインスタンスタイプに対応するクラスターが作成されます。
+
+例:
+
+```bash
 #!/bin/sh
 #SBATCH -n 72
 #SBATCH --ntasks-per-node 36
@@ -239,191 +134,207 @@ Example in `/opt/oci-hpc/samples/submit/`:
 #SBATCH --constraint hpc-default
 
 cd /nfs/scratch
-mkdir $SLURM_JOB_ID
-cd $SLURM_JOB_ID
+mkdir "$SLURM_JOB_ID"
+cd "$SLURM_JOB_ID"
+
 MACHINEFILE="hostfile"
+scontrol show hostnames "$SLURM_JOB_NODELIST" > "$MACHINEFILE"
+sed -i "s/$/:${SLURM_NTASKS_PER_NODE}/" "$MACHINEFILE"
 
-# Generate Machinefile for mpi such that hosts are in the same
-#  order as if run via srun
-#
-scontrol show hostnames $SLURM_JOB_NODELIST > $MACHINEFILE
-sed -i "s/$/:${SLURM_NTASKS_PER_NODE}/" $MACHINEFILE
-
-cat $MACHINEFILE
-# Run using generated Machine file:
+cat "$MACHINEFILE"
 sleep 1000
 ```
- 
-- Instance Type: You can specify the OCI instance type that you’d like to run on as a constraint. This will make sure that you run on the right shape and also generate the right cluster. Instance types are defined in the `/opt/oci-hpc/conf/queues.conf` file in yml format. Leave all of the field in there even if they are not used. You can define multiple queues and multiple instance type in each queue. If you do not select an instance type when creating your job, it will use the default one.
 
-- cpu-bind: On Ubuntu 22.04, we are switching to Cgroup v2 and we did notice that when hyperthreading is turned off. The default cpu-bind may give some issues. If you get an error like `error: task_g_set_affinity: Invalid argument`, you can try running your job with --cpu-bind=none or --cpu-bind=sockets
-## Clusters folders: 
-```
-/opt/oci-hpc/autoscaling/clusters/clustername
+デフォルトでは、ジョブがインスタンスタイプを指定しない場合、キュー内で `default: true` のインスタンスタイプが使われます。デフォルト以外のキューへ投入する場合は、SBATCH ファイルに `#SBATCH --partition <queue_name>` を追加するか、コマンドラインで `sbatch -p <queue_name> job.sh` を指定します。
+
+Ubuntu 22.04 かつ Hyperthreading を無効化した環境で `error: task_g_set_affinity: Invalid argument` が出る場合は、`--cpu-bind=none` または `--cpu-bind=sockets` を試してください。
+
+## ディレクトリとログ
+
+コントローラ上では、クラスター管理用ファイルが次の場所に配置されます。
+
+```text
+/opt/oci-hpc
 ```
 
-## Logs: 
+Autoscaling で作成されたクラスターごとの Terraform 作業ディレクトリ:
+
+```text
+/opt/oci-hpc/autoscaling/clusters/<cluster_name>
 ```
+
+ログ:
+
+```text
 /opt/oci-hpc/logs
 ```
 
-Each cluster will have his own log with name: `create_clustername_date.log` and `delete_clustername_date.log`
-The log of the crontab will be in `crontab_slurm.log`
+クラスターごとに `create_<cluster_name>_<date>.log` と `delete_<cluster_name>_<date>.log` が作成されます。cron のログは日付付きの `crontab_slurm_<yyyymmdd>.log` に出力されます。
 
+## 手動クラスター操作
 
-## Manual clusters: 
-You can create and delete your clusters manually. 
-### Cluster Creation
+Autoscaling と同じ仕組みを使って、クラスターを手動で作成・削除できます。
+
+作成:
+
+```bash
+/opt/oci-hpc/bin/create_cluster.sh <node_count> <cluster_name> <instance_type> <queue_name>
 ```
-/opt/oci-hpc/bin/create_cluster.sh NodeNumber clustername instance_type queue_name
-```
-Example: 
-```
+
+例:
+
+```bash
 /opt/oci-hpc/bin/create_cluster.sh 4 compute2-1-hpc HPC_instance compute2
 ```
-The name of the cluster must be
-queueName-clusterNumber-instanceType_keyword
 
-The keyword will need to match the one from /opt/oci-hpc/conf/queues.conf to be registered in Slurm
+クラスター名は次の形式にします。
 
-### Cluster Deletion: 
-```
-/opt/oci-hpc/bin/delete_cluster.sh clustername
+```text
+<queue_name>-<cluster_number>-<instance_keyword>
 ```
 
-In case something goes wrong during the deletion, you can force the deletion with 
+`instance_keyword` は `queues.conf` の値と一致させてください。
+
+削除:
+
+```bash
+/opt/oci-hpc/bin/delete_cluster.sh <cluster_name>
 ```
-/opt/oci-hpc/bin/delete_cluster.sh clustername FORCE
+
+削除中に問題が起きた場合は、強制削除を指定できます。
+
+```bash
+/opt/oci-hpc/bin/delete_cluster.sh <cluster_name> FORCE
 ```
-When the cluster is already being destroyed, it will have a file `/opt/oci-hpc/autoscaling/clusters/clustername/currently_destroying` 
 
-## Autoscaling Monitoring
-If you selected the autoscaling monitoring, you can see what nodes are spinning up and down as well as running and queued jobs. Everything will run automatically except the import of the Dashboard in Grafana due to a problem in the Grafana API. 
+削除処理中のクラスターには、次のファイルが作成されます。
 
-To do it manually, in your browser of choice, navigate to controllerIP:3000. Username and password are admin/admin, you can change those during your first login. Go to Configuration -> Data Sources. Select autoscaling. Enter Password as Monitor1234! and click on 'Save & test'. Now click on the + sign on the left menu bar and select import. Click on Upload JSON file and upload the file the is located at `/opt/oci-hpc/playbooks/roles/autoscaling_mon/files/dashboard.json`. Select autoscaling (MySQL) as your datasource. 
+```text
+/opt/oci-hpc/autoscaling/clusters/<cluster_name>/currently_destroying
+```
 
-You will now see the dashboard. 
+## Autoscaling モニタリング
 
+`autoscaling_monitoring` を有効にすると、Grafana でクラスターの作成・削除状況と Slurm ジョブ状況を確認できます。Grafana API の制約により、ダッシュボードのインポートは手動で行います。
 
-# LDAP 
-If selected controller host will act as an LDAP server for the cluster. It's strongly recommended to leave default, shared home directory. 
-User management can be performed from the controller using ``` cluster ``` command. 
-Example of cluster command to add a new user: 
-```cluster user add name```
-By default, a `privilege` group is created that has access to the NFS and can have sudo access on all nodes (Defined at the stack creation. This group has ID 9876) The group name can be modified.
-```cluster user add name --gid 9876```
-To avoid generating a user-specific key for passwordless ssh between nodes, use --nossh. 
-```cluster user add name --nossh --gid 9876```
+1. ブラウザで `http://<controller_ip>:3000` にアクセスします。
+2. 初期ユーザー名 / パスワードは `admin/admin` です。
+3. `Configuration -> Data Sources` で `autoscaling` を選択します。
+4. Password に `Monitor1234!` を入力し、`Save & test` を実行します。
+5. 左メニューの `+` から `Import` を選択し、次の JSON をアップロードします。
 
-# Shared home folder
+```text
+/opt/oci-hpc/playbooks/roles/autoscaling_mon/files/dashboard.json
+```
 
-By default, the home folder is NFS shared directory between all nodes from the controller. You have the possibility to use a FSS to share it as well to keep working if the controller goes down. You can either create the FSS from the GUI. Be aware that it will get destroyed when you destroy the stack. Or you can pass an existing FSS IP and path. If you share an existing FSS, do not use /home as mountpoint. The stack will take care of creating a $nfsshare/home directory and mounting it at /home after copying all the appropriate files. 
+Data Source には `autoscaling (MySQL)` を選択します。
 
-# Deploy within a private subnet
+## LDAP とユーザー管理
 
-If "true", this will create a private endpoint in order for Oracle Resource Manager to configure the controller VM and the future nodes in private subnet(s). 
-* If "Use Existing Subnet" is false, Terraform will create 2 private subnets, one for the controller and one for the compute nodes.  
-* If "Use Existing Subnet" is also true, the user must indicate a private subnet for the controller VM. For the compute nodes, they can reside in another private subnet or the same private subent as the controller VM. 
+`ldap` を有効にした場合、コントローラはクラスター用 LDAP サーバーとして動作します。ホームディレクトリは共有構成のまま使うことを推奨します。
 
-The controller VM will reside in a private subnet. Therefore, the creation of a "controller service" (https://docs.oracle.com/en-us/iaas/Content/controller/Concepts/controlleroverview.htm), a VPN or FastConnect connection is required. If a public subnet exists in the VCN, adapting the security lists and creating a jump host can also work. Finally, a Peering can also be established betwen the private subnet and another VCN reachable by the user.
+ユーザー管理はコントローラ上の `cluster` コマンドで行います。
 
+```bash
+cluster user add <name>
+```
 
+デフォルトでは `privilege` グループが作成されます。このグループは NFS へのアクセス権を持ち、設定により全ノードで sudo 権限を持ちます。デフォルト GID は `9876` です。
 
-## max_nodes_partition.py usage 
+```bash
+cluster user add <name> --gid 9876
+cluster user add <name> --nossh --gid 9876
+```
 
-Use the alias "max_nodes" to run the python script max_nodes_partition.py. You can run this script only from controller.
+`--nossh` を指定すると、ノード間パスワードレス SSH 用のユーザー固有鍵を作成しません。
 
-$ max_nodes --> Information about all the partitions and their respective clusters, and maximum number of nodes distributed evenly per partition
+## 共有ホームディレクトリ
 
-$ max_nodes --include_cluster_names xxx yyy zzz --> where xxx, yyy, zzz are cluster names. Provide a space separated list of cluster names to be considered for displaying the information about clusters and maximum number of nodes distributed evenly per partition
+デフォルトでは、コントローラが `/home` を NFS で全ノードに共有します。FSS を使う場合は、既存 FSS の IP / パスを指定するか、スタックで FSS を作成できます。
 
+既存 FSS を使う場合、マウントポイントに `/home` を直接指定しないでください。スタックは `$nfs_source_path/home` を作成し、必要なファイルをコピーしたうえで `/home` にマウントします。
 
-## validation.py usage
+## 追加ストレージ
 
-Use the alias "validate" to run the python script validation.py. You can run this script only from controller. 
+`use_cluster_nfs` を有効にすると、コントローラから `cluster_nfs_path` を NFS 共有します。デフォルトは `/nfs/cluster` です。
 
-The script performs these checks. 
--> Check the number of nodes is consistent across resize, /etc/hosts, slurm, topology.conf, OCI console, inventory files.
--> PCIe bandwidth check 
--> GPU Throttle check 
--> Check whether md5 sum of /etc/hosts file on nodes matches that on controller
+`use_scratch_nfs` を有効にすると、計算ノード側の NVMe または Block Volume を使って scratch 領域を NFS 共有します。デフォルトの scratch マウントポイントは `/nfs/scratch` です。
 
-Provide at least one argument: [-n NUM_NODES] [-p PCIE] [-g GPU_THROTTLE] [-e ETC_HOSTS]
+追加 NFS / FSS を `nfs_target_path` にマウントすることもできます。ただし、追加 NFS の設定から `/home` を直接構成しないでください。`/home` にはストレージ詳細オプションの専用設定を使います。
 
-Optional argument with [-n NUM_NODES] [-p PCIE] [-g GPU_THROTTLE] [-e ETC_HOSTS]: [-cn CLUSTER_NAMES]
-Provide a file that lists each cluster on a separate line for which you want to validate the number of nodes and/or pcie check and/or gpu throttle check and/or /etc/hosts md5 sum. 
+## プライベートサブネットへのデプロイ
 
-For pcie, gpu throttle, and /etc/hosts md5 sum check, you can either provide y or Y along with -cn or you can give the hostfile path (each host on a separate line) for each argument. For number of nodes check, either provide y or give y along with -cn.
+`private_deployment` を `true` にすると、コントローラに Public IP を付与せず、Resource Manager Private Endpoint 経由で構成します。
 
-Below are some examples for running this script.
+- 新規 VCN を作成する場合、コントローラ用と計算ノード用のプライベートサブネットを作成します。
+- 既存 VCN を使う場合は、コントローラ用 subnet と計算ノード用 private subnet を指定します。
+- コントローラへ SSH 接続するには、Controller Service、VPN、FastConnect、踏み台ホスト、または到達可能な VCN Peering が必要です。
 
-validate -n y --> This will validate that the number of nodes is consistent across resize, /etc/hosts, slurm, topology.conf, OCI console, inventory files. The clusters considered will be the default cluster if any and cluster(s) found in /opt/oci-hpc/autoscaling/clusters directory. The number of nodes considered will be from the resize script using the clusters we got before. 
+## Open OnDemand
 
-validate -n y -cn <cluster name file> --> This will validate that the number of nodes is consistent across resize, /etc/hosts, slurm, topology.conf, OCI console, inventory files. It will also check whether md5 sum of /etc/hosts file on all nodes matches that on controller. The clusters considered will be from the file specified by -cn option. The number of nodes considered will be from the resize script using the clusters from the file. 
+`use_ood` を有効にすると、Open OnDemand をインストールします。ユーザーはブラウザからファイル操作、ジョブ投入、アプリケーション実行を行えます。スタックは Open OnDemand 用の初期パスワードも生成し、構成に反映します。
 
-validate -p y -cn <cluster name file> --> This will run the pcie bandwidth check. The clusters considered will be from the file specified by -cn option. The number of nodes considered will be from the resize script using the clusters from the file. 
+## collect_logs.py
 
-validate -p <pcie host file> --> This will run the pcie bandwidth check on the hosts provided in the file given. The pcie host file should have a host name on each line.
+`/opt/oci-hpc/scripts/collect_logs.py` は、指定ノードの NVIDIA bug report、sosreport、console history log を収集します。コントローラ上で実行します。
 
-validate -g y -cn <cluster name file> --> This will run the GPU throttle check. The clusters considered will be from the file specified by -cn option. The number of nodes considered will be from the resize script using the clusters from the file. 
+到達可能なノードでは NVIDIA bug report と sosreport も取得します。SSH できないノードでは console history log のみを取得します。
 
-validate -g <gpu check host file> --> This will run the GPU throttle check on the hosts provided in the file given. The gpu check host file should have a host name on each line.
+必須引数:
 
-validate -e y -cn <cluster name file> --> This will run the /etc/hosts md5 sum check. The clusters considered will be from the file specified by -cn option. The number of nodes considered will be from the resize script using the clusters from the file. 
+```text
+--hostname <hostname>
+```
 
-validate -e <md5 sum check host file> --> This will run the /etc/hosts md5 sum check on the hosts provided in the file given. The md5 sum check host file should have a host name on each line.
+任意引数:
 
-You can combine all the options together such as:
-validate -n y -p y -g y -e y -cn <cluster name file>
+```text
+--compartment-id <compartment_ocid>
+```
 
+例:
 
-## /opt/oci-hpc/scripts/collect_logs.py
-This is a script to collect nvidia bug report, sosreport, console history logs. 
-
-The script needs to be run from the controller. In the case where the host is not ssh-able, it will get only  console history logs for the same.
-
-It requires the below argument.
---hostname <HOSTNAME>
-
-And --compartment-id <COMPARTMENT_ID> is optional (i.e. assumption is the host is in the same compartment as the controller). 
-
-Where HOSTNAME is the node name for which you need the above logs and COMPARTMENT_ID is the OCID of the compartment where the node is.
-
-The script will get all the above logs and put them in a folder specific to each node in /home/{user}. It will give the folder name as the output.
-
-Assumption: For getting the console history logs, the script expects to have the node name in /etc/hosts file.
-
-Examples:
-
+```bash
+cd /opt/oci-hpc/scripts
 python3 collect_logs.py --hostname compute-permanent-node-467
-The nvidia bug report, sosreport, and console history logs for compute-permanent-node-467 are at /home/ubuntu/compute-permanent-node-467_06132023191024
+python3 collect_logs.py --hostname inst-jxwf6-keen-drake --compartment-id <compartment_ocid>
+```
 
-python3 collect_logs.py --hostname inst-jxwf6-keen-drake
-The nvidia bug report, sosreport, and console history logs for inst-jxwf6-keen-drake are at /home/ubuntu/inst-jxwf6-keen-drake_11112022001138
+出力ファイルは `/home/<user>/<hostname>_<timestamp>` に保存されます。
 
-for x in `less /home/opc/hostlist` ; do echo $x ; python3 collect_logs.py --hostname $x; done ;
-compute-permanent-node-467
-The nvidia bug report, sosreport, and console history logs for compute-permanent-node-467 are at /home/ubuntu/compute-permanent-node-467_11112022011318
-compute-permanent-node-787
-The nvidia bug report, sosreport, and console history logs for compute-permanent-node-787 are at /home/ubuntu/compute-permanent-node-787_11112022011835
+複数ノードを処理する例:
 
-Where hostlist had the below contents
-compute-permanent-node-467
-compute-permanent-node-787
+```bash
+for host in $(cat /home/opc/hostlist); do
+  echo "$host"
+  python3 collect_logs.py --hostname "$host"
+done
+```
 
+## RDMA NIC メトリックの Object Storage アップロード
 
-## Collect RDMA NIC Metrics and Upload to Object Storage
+OCI-HPC はユーザー tenancy にデプロイされるため、OCI service team がクラスター内のメトリックを直接確認することはできません。`controller_object_storage_par` を有効にすると、RDMA NIC メトリックを Object Storage にアップロードするための PAR を作成できます。
 
-OCI-HPC is deployed in customer tenancy. So, OCI service teams cannot access metrics from these OCI-HPC stack clusters. Due to overcome this issue, in release,
-we introduce a feature to collect RDMA NIC Metrics and upload those metrics to Object Storage. Later on, that Object Storage URL could be shared with OCI service
-teams. After that URL, OCI service teams could access metrics and use those metrics for debugging purpose.
+Resource Manager の stack 作成時に `Create Object Storage PAR` を選択すると、PAR が作成され、`PAR_file_for_metrics` に保存されます。
 
-To collect RDMA NIC Metrics and upload those to Object Storage, user needs to follow these following steps:
+メトリック収集とアップロードはコントローラ上で実行します。
 
-Step 1: Create a PAR (PreAuthenticated Request)
-For creating a PAR, user needs to select check-box "Create Object Storage PAR" during Resource Manager's stack creation.
-By default, this check box is enabled. By selecting, this check-box, a PAR would be created.
+```bash
+/opt/oci-hpc/bin/upload_rdma_nic_metrics.sh
+```
 
-Step 2: Use shell script: upload_rdma_nic_metrics.sh to collect metrics and upload to object storage.
-User needs to use shell script: upload_rdma_nic_metrics.sh to collect metrics and upload to object storage. User could configure metrics
-collection limit and interval through config file: rdma_metrics_collection_config.conf.
+オプション:
+
+```bash
+/opt/oci-hpc/bin/upload_rdma_nic_metrics.sh -l 24 -i 5 -c <cluster_name>
+```
+
+- `-l`: 現在から何時間前までを収集するか。デフォルトは `24`。
+- `-i`: メトリック集計間隔。デフォルトは `5` 分。
+- `-c`: アップロードファイル名に付けるクラスター名。
+
+デフォルト値は次の設定ファイルで変更できます。
+
+```text
+/opt/oci-hpc/bin/rdma_metrics_collection_config.conf
+```
