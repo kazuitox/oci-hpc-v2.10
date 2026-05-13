@@ -54,6 +54,9 @@ resource "local_file" "inventory" {
     pyxis = var.pyxis,
     enroot = var.enroot,
     spack = var.spack,
+    install_application = var.install_application,
+    application = var.application,
+    application_version = var.application_version,
     ldap = var.ldap,
     timezone = var.timezone,
     tags = var.tags,
@@ -75,7 +78,7 @@ resource "local_file" "inventory" {
     hyperthreading = var.hyperthreading,
     privilege_sudo = var.privilege_sudo,
     privilege_group_name = var.privilege_group_name,
-    latency_check = var.latency_check
+    latency_check = var.latency_check,
     controller_username = var.controller_username,
     compute_username = var.compute_username,
     ood_opc_password = var.ood_opc_password,

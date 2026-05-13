@@ -220,6 +220,9 @@
     - include_role: 
         name: spack
       when: spack|default(false)|bool
+    - include_role:
+        name: openfoam
+      when: install_application|default(false)|bool and application|default('OpenFOAM') == 'OpenFOAM'
     - include_role: 
         name: slurm
       when: slurm|default(false)|bool
