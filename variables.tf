@@ -15,7 +15,7 @@ variable "compute_cluster_start_index" { default = 0 }
 variable "use_custom_name" { default = false }
 variable "cluster_name" { default = "" }
 variable "controller_ad" { default = "" }
-variable "controller_shape" { default = "VM.Standard.E6.Flex" }
+variable "controller_shape" { default = "VM.Standard.E5.Flex" }
 variable "controller_object_storage_par" { default = false }
 variable "custom_controller_image" {
   type = string
@@ -89,7 +89,7 @@ variable "spack" { default = false }
 variable "install_application" { default = false }
 variable "application" { default = "OpenFOAM" }
 variable "application_version" { default = "v2312" }
-variable "controller_ocpus" { default = 4}
+variable "controller_ocpus" { default = 2}
 variable "controller_ocpus_denseIO_flex" { default = 8}
 variable "instance_pool_ocpus" { default = 2}
 variable "instance_pool_ocpus_denseIO_flex" { default = 8}

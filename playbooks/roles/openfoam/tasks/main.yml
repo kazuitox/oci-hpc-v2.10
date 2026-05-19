@@ -39,7 +39,6 @@
       - m4
       - qt5-qtbase
       - qt5-qtbase-devel
-      - rsync
       - tar
       - wget
   include_role:
@@ -57,7 +56,7 @@
   failed_when: openfoam_mpivars.stdout == ''
   when: openfoam_compile_host | bool
 
-- name: Create OpenFOAM install root directory
+- name: Create OpenFOAM root directory
   file:
     path: "{{ openfoam_root }}"
     state: directory
@@ -67,245 +66,53 @@
   become: true
   when: openfoam_compile_host | bool
 
-- name: Check OpenFOAM install marker
-  stat:
-    path: "{{ openfoam_install_marker }}"
-  register: openfoam_install_marker_stat
-  become: true
-  when: openfoam_compile_host | bool
-
-- name: Create OpenFOAM local build root directory
-  file:
-    path: "{{ openfoam_build_root }}"
-    state: directory
-    owner: "{{ controller_username | default('opc') }}"
-    mode: '0755'
-  become: true
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
-
 - name: Download OpenFOAM source archive
   get_url:
     url: "{{ openfoam_source_url }}"
-    dest: "{{ openfoam_build_root }}/OpenFOAM-{{ openfoam_version }}.tgz"
+    dest: "{{ openfoam_root }}/OpenFOAM-{{ openfoam_version }}.tgz"
     mode: '0644'
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
+  when: openfoam_compile_host | bool
 
 - name: Download OpenFOAM ThirdParty archive
   get_url:
     url: "{{ openfoam_thirdparty_url }}"
-    dest: "{{ openfoam_build_root }}/ThirdParty-{{ openfoam_version }}.tgz"
+    dest: "{{ openfoam_root }}/ThirdParty-{{ openfoam_version }}.tgz"
     mode: '0644'
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
+  when: openfoam_compile_host | bool
 
-- name: Extract OpenFOAM source into local build root
+- name: Extract OpenFOAM source
   unarchive:
-    src: "{{ openfoam_build_root }}/OpenFOAM-{{ openfoam_version }}.tgz"
-    dest: "{{ openfoam_build_root }}"
+    src: "{{ openfoam_root }}/OpenFOAM-{{ openfoam_version }}.tgz"
+    dest: "{{ openfoam_root }}"
     remote_src: true
-    creates: "{{ openfoam_build_project_dir }}/etc/bashrc"
+    creates: "{{ openfoam_project_dir }}/etc/bashrc"
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
+  when: openfoam_compile_host | bool
 
-- name: Extract OpenFOAM ThirdParty source into local build root
+- name: Extract OpenFOAM ThirdParty source
   unarchive:
-    src: "{{ openfoam_build_root }}/ThirdParty-{{ openfoam_version }}.tgz"
-    dest: "{{ openfoam_build_root }}"
+    src: "{{ openfoam_root }}/ThirdParty-{{ openfoam_version }}.tgz"
+    dest: "{{ openfoam_root }}"
     remote_src: true
-    creates: "{{ openfoam_build_thirdparty_dir }}"
+    creates: "{{ openfoam_thirdparty_dir }}"
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
+  when: openfoam_compile_host | bool
 
-- name: Check OpenFOAM local build marker
-  stat:
-    path: "{{ openfoam_build_marker }}"
-  register: openfoam_local_build_marker_stat
-  become: true
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
-
-- name: Build and verify OpenFOAM locally
-  vars:
-    openfoam_build_environment: |
-      set -o pipefail
-
-      openfoam_fail() {
-          local rc="$1"
-          shift
-          echo "FAILED command: $* (rc=${rc})" >&2
-          exit "${rc}"
-      }
-
-      openfoam_run() {
-          "$@"
-          local rc=$?
-          if [ "${rc}" -ne 0 ]; then
-              openfoam_fail "${rc}" "$@"
-          fi
-      }
-
-      openfoam_cd() {
-          cd "$1"
-          local rc=$?
-          if [ "${rc}" -ne 0 ]; then
-              openfoam_fail "${rc}" "cd $1"
-          fi
-      }
-
-      for openfoam_env_file in "{{ openfoam_mpivars.stdout }}" "{{ openfoam_build_project_dir }}/etc/bashrc"; do
-          if [ ! -r "${openfoam_env_file}" ]; then
-              echo "OpenFOAM environment file is not readable: ${openfoam_env_file}" >&2
-              exit 1
-          fi
-      done
-      source "{{ openfoam_mpivars.stdout }}"
-      source "{{ openfoam_build_project_dir }}/etc/bashrc"
-      if [ -z "${WM_PROJECT_DIR:-}" ]; then
-          echo "WM_PROJECT_DIR is not set after sourcing {{ openfoam_build_project_dir }}/etc/bashrc" >&2
-          exit 1
-      fi
-      export LC_ALL=C
-  block:
-    - name: Check OpenFOAM build environment
-      shell: |
-        {{ openfoam_build_environment }}
-        openfoam_run foamSystemCheck
-      args:
-        chdir: "{{ openfoam_build_project_dir }}"
-        executable: /bin/bash
-      changed_when: false
-
-    - name: Compile OpenFOAM sources
-      shell: |
-        {{ openfoam_build_environment }}
-        openfoam_cd "${WM_PROJECT_DIR}"
-        openfoam_run ./Allwmake -j {{ openfoam_build_jobs }} -s -q -l
-      args:
-        chdir: "{{ openfoam_build_project_dir }}"
-        executable: /bin/bash
-        creates: "{{ openfoam_build_marker }}"
-
-    - name: Test local OpenFOAM installation
-      shell: |
-        {{ openfoam_build_environment }}
-        openfoam_run foamInstallationTest
-      args:
-        chdir: "{{ openfoam_build_project_dir }}"
-        executable: /bin/bash
-      changed_when: false
-  become: true
-  become_user: "{{ controller_username | default('opc') }}"
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
-    - not (openfoam_local_build_marker_stat.stat.exists | default(false) | bool)
-
-- name: Copy OpenFOAM build to install root
+- name: Compile OpenFOAM
   shell: |
-    set -o pipefail
-    mkdir -p "{{ openfoam_project_dir }}" "{{ openfoam_thirdparty_dir }}"
-
-    pids=()
-    names=()
-
-    rsync -a --delete --no-owner --no-group "{{ openfoam_build_project_dir }}/" "{{ openfoam_project_dir }}/" &
-    pids+=("$!")
-    names+=("OpenFOAM-{{ openfoam_version }}")
-
-    rsync -a --delete --no-owner --no-group "{{ openfoam_build_thirdparty_dir }}/" "{{ openfoam_thirdparty_dir }}/" &
-    pids+=("$!")
-    names+=("ThirdParty-{{ openfoam_version }}")
-
-    rsync -a --no-owner --no-group "{{ openfoam_build_root }}/OpenFOAM-{{ openfoam_version }}.tgz" "{{ openfoam_root }}/" &
-    pids+=("$!")
-    names+=("OpenFOAM-{{ openfoam_version }}.tgz")
-
-    rsync -a --no-owner --no-group "{{ openfoam_build_root }}/ThirdParty-{{ openfoam_version }}.tgz" "{{ openfoam_root }}/" &
-    pids+=("$!")
-    names+=("ThirdParty-{{ openfoam_version }}.tgz")
-
-    copy_status=0
-    for idx in "${!pids[@]}"; do
-        if ! wait "${pids[$idx]}"; then
-            echo "FAILED copy: ${names[$idx]}" >&2
-            copy_status=1
-        fi
-    done
-
-    exit "${copy_status}"
-  args:
-    executable: /bin/bash
-  become: true
-  when:
-    - openfoam_compile_host | bool
-    - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
-
-- name: Test OpenFOAM installation from install root
-  vars:
-    openfoam_install_environment: |
-      set -o pipefail
-
-      openfoam_fail() {
-          local rc="$1"
-          shift
-          echo "FAILED command: $* (rc=${rc})" >&2
-          exit "${rc}"
-      }
-
-      openfoam_run() {
-          "$@"
-          local rc=$?
-          if [ "${rc}" -ne 0 ]; then
-              openfoam_fail "${rc}" "$@"
-          fi
-      }
-
-      for openfoam_env_file in "{{ openfoam_mpivars.stdout }}" "{{ openfoam_project_dir }}/etc/bashrc"; do
-          if [ ! -r "${openfoam_env_file}" ]; then
-              echo "OpenFOAM environment file is not readable: ${openfoam_env_file}" >&2
-              exit 1
-          fi
-      done
-      source "{{ openfoam_mpivars.stdout }}"
-      source "{{ openfoam_project_dir }}/etc/bashrc"
-      if [ -z "${WM_PROJECT_DIR:-}" ]; then
-          echo "WM_PROJECT_DIR is not set after sourcing {{ openfoam_project_dir }}/etc/bashrc" >&2
-          exit 1
-      fi
-      export LC_ALL=C
-  shell: |
-    {{ openfoam_install_environment }}
-    openfoam_run foamInstallationTest
+    set -eo pipefail
+    source "{{ openfoam_mpivars.stdout }}"
+    source "{{ openfoam_project_dir }}/etc/bashrc"
+    foamSystemCheck
+    cd "${WM_PROJECT_DIR}"
+    export LC_ALL=C
+    ./Allwmake -j {{ openfoam_build_jobs }} -s -q -l
+    foamInstallationTest
   args:
     chdir: "{{ openfoam_project_dir }}"
     executable: /bin/bash
-  become: true
-  become_user: "{{ controller_username | default('opc') }}"
-  changed_when: false
-  when: openfoam_compile_host | bool
-
-- name: Mark OpenFOAM installation complete
-  copy:
-    dest: "{{ openfoam_install_marker }}"
-    content: "OpenFOAM {{ openfoam_version }} installed\n"
-    owner: root
-    group: "{{ privilege_group_name | default('root') }}"
-    mode: '0644'
+    creates: "{{ openfoam_build_marker }}"
   become: true
   when: openfoam_compile_host | bool

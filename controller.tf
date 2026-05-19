@@ -521,7 +521,7 @@ provisioner "file" {
       "chmod 755 /opt/oci-hpc/samples/*.sh",
       "chmod 600 /opt/oci-hpc/autoscaling/credentials/key.pem",
       "echo ${var.configure} > /tmp/configure.conf",
-      "timeout 3h /opt/oci-hpc/bin/configure.sh | tee /opt/oci-hpc/logs/initial_configure.log",
+      "timeout 2h /opt/oci-hpc/bin/configure.sh | tee /opt/oci-hpc/logs/initial_configure.log",
       "exit_code=$${PIPESTATUS[0]}",
       "/opt/oci-hpc/bin/initial_monitoring.sh",
       "exit $exit_code"     ]
