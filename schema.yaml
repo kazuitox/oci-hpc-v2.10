@@ -1708,7 +1708,7 @@ variables:
     type: boolean
     title: アプリケーションを追加
     default: false
-    description: 共有領域にアプリケーションをインストールします。
+    description: 共有ストレージにアプリケーションをインストールします。コンパイルを行うので作成時間が長くなります。
   application:
     type: enum
     title: 対象アプリケーション
