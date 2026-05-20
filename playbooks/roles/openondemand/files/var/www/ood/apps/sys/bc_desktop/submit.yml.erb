@@ -4,3 +4,5 @@ batch_connect:
 cluster: "myslurm"
 script:
   queue_name: <%= bc_queue %>
+  native:
+    - "--exclusive"
