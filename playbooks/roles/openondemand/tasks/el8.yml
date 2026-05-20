@@ -7,8 +7,11 @@
              | default(ansible_host
              | default(ansible_default_ipv4.address)) }}
         ood_private_ip: "{{ ansible_host | default(ansible_default_ipv4.address) }}"
+        ood_effective_ldap_host: "{{ ood_ldap_host }}"
+        ood_ldap_hostname: "{{ ood_ldap_host.split(':')[0] }}"
+        ood_server_is_ip: "{{ (controller_public_ip | default(ansible_host | default(ansible_default_ipv4.address))) is match('^([0-9]{1,3}\\.){3}[0-9]{1,3}$') }}"
 
-    - name: OpenOnDemand | Set opc password for PAM authentication
+    - name: OpenOnDemand | Set opc password when provided
       ansible.builtin.user:
         name: opc
         password: "{{ ood_opc_password | password_hash('sha512') }}"
@@ -48,10 +51,13 @@
         state: present
         disable_gpg_check: true
 
-    - name: Install ondemand and mod_authnz_pam
+    - name: Install Open OnDemand Dex login packages
       ansible.builtin.dnf:
         name:
           - ondemand
+          - ondemand-dex
+          - mod_auth_openidc
+          - httpd-tools
           - mod_authnz_pam
         state: present
 
@@ -61,12 +67,6 @@
         enabled: true
         state: started
 
-    - name: Ensure authnz_pam module is enabled
-      ansible.builtin.lineinfile:
-        path: /etc/httpd/conf.modules.d/55-authnz_pam.conf
-        regexp: '^\s*#\s*LoadModule\s+authnz_pam_module\s+modules/mod_authnz_pam\.so\s*$'
-        line: 'LoadModule authnz_pam_module modules/mod_authnz_pam.so'
-
     - name: Ensure directories for TLS files exist
       ansible.builtin.file:
         path: "{{ item }}"
@@ -75,22 +75,84 @@
       loop:
         - /etc/pki/tls/private
         - /etc/pki/tls/certs
+        - "{{ ssl_cert_path }}"
 
-    - name: Generate self-signed certificate
+    - name: OpenOnDemand | Ensure cluster CA exists for OOD TLS
       ansible.builtin.command: >
-        openssl req -new -newkey rsa:4096 -nodes -x509 -sha256 -days 825
-        -keyout /etc/pki/tls/private/ood-ip.key
-        -out /etc/pki/tls/certs/ood-ip.crt
-        -subj "/CN={{ ood_servername }}"
-        -addext "subjectAltName = IP:{{ ood_private_ip }}"
+        openssl req -newkey rsa:4096
+        -nodes -sha512 -x509
+        -days {{ ssl_cert_days | default(3650) }}
+        -subj "/C=US/L=Seattle/O=Oracle Cloud/CN=oraclecluster.com"
+        -out {{ ssl_ca_cert }}
+        -keyout {{ ssl_cert_path }}/cluster-ca.key
       args:
-        creates: "/etc/pki/tls/certs/ood-ip.crt"
+        creates: "{{ ssl_ca_cert }}"
 
-    - name: Install self-signed cert into local trust anchors
+    - name: OpenOnDemand | Render TLS certificate request config
+      ansible.builtin.template:
+        src: ood_tls_server.cnf.j2
+        dest: "{{ ood_tls_config }}"
+        mode: "0644"
+
+    - name: OpenOnDemand | Inspect existing TLS certificate
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - x509
+          - -in
+          - "{{ ood_tls_cert }}"
+          - -noout
+          - -text
+      register: ood_existing_tls_cert
+      changed_when: false
+      failed_when: false
+
+    - name: OpenOnDemand | Decide whether to regenerate TLS certificate
+      ansible.builtin.set_fact:
+        ood_tls_needs_regen: >-
+          {{ ood_existing_tls_cert.rc != 0
+             or 'CA:FALSE' not in ood_existing_tls_cert.stdout
+             or (ood_server_is_ip | bool and ('IP Address:' ~ ood_servername) not in ood_existing_tls_cert.stdout)
+             or (not (ood_server_is_ip | bool) and ('DNS:' ~ ood_servername) not in ood_existing_tls_cert.stdout) }}
+
+    - name: OpenOnDemand | Create TLS certificate signing request
+      ansible.builtin.command: >
+        openssl req -new -newkey rsa:4096 -nodes -sha256
+        -keyout {{ ood_tls_key }}
+        -out {{ ood_tls_csr }}
+        -subj "/CN={{ ood_servername }}"
+        -config {{ ood_tls_config }}
+      when: ood_tls_needs_regen | bool
+
+    - name: OpenOnDemand | Sign TLS certificate with cluster CA
+      ansible.builtin.command: >
+        openssl x509 -req
+        -in {{ ood_tls_csr }}
+        -CA {{ ssl_ca_cert }}
+        -CAkey {{ ssl_cert_path }}/cluster-ca.key
+        -CAcreateserial
+        -out {{ ood_tls_cert }}
+        -days {{ ood_tls_days }}
+        -sha256
+        -extfile {{ ood_tls_config }}
+        -extensions v3_server
+      when: ood_tls_needs_regen | bool
+
+    - name: OpenOnDemand | Set TLS certificate permissions
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - path: "{{ ood_tls_key }}"
+          mode: "0600"
+        - path: "{{ ood_tls_cert }}"
+          mode: "0644"
+
+    - name: Install cluster CA into local trust anchors
       ansible.builtin.copy:
-        src: /etc/pki/tls/certs/ood-ip.crt
+        src: "{{ ssl_ca_cert }}"
         remote_src: true
-        dest: "/etc/pki/ca-trust/source/anchors/ood-ip.crt"
+        dest: "/etc/pki/ca-trust/source/anchors/cluster-ca.crt"
         mode: "0644"
 
     - name: Update CA trust
@@ -103,34 +165,83 @@
         state: directory
         mode: "0755"
 
-    - name: Deploy ood_portal.yml
+    - name: OpenOnDemand | Ensure OpenLDAP certificate directory exists
+      ansible.builtin.file:
+        path: "{{ ood_ldap_root_ca | dirname }}"
+        state: directory
+        mode: "0755"
+      when:
+        - ood_enable_dex_ldap | bool
+        - ood_ldap_root_ca | default('') | length > 0
+
+    - name: OpenOnDemand | Install LDAP CA for Dex
       ansible.builtin.copy:
-        dest: /etc/ood/config/ood_portal.yml
-        mode: "0644"
-        content: |
-          ---
-          servername: "{{ ood_servername }}"
-
-          ssl:
-            - 'SSLCertificateFile "/etc/pki/tls/certs/ood-ip.crt"'
-            - 'SSLCertificateKeyFile "/etc/pki/tls/private/ood-ip.key"'
-
-          auth:
-            - 'AuthType Basic'
-            - 'AuthName "Open OnDemand"'
-            - 'AuthBasicProvider PAM'
-            - 'AuthPAMService ood'
-            - 'Require valid-user'
-
-    - name: Ensure PAM service file for OOD exists
-      ansible.builtin.copy:
-        src: /etc/pam.d/sshd
+        src: "{{ ssl_ca_cert }}"
         remote_src: true
-        dest: /etc/pam.d/ood
+        dest: "{{ ood_ldap_root_ca }}"
+        mode: "0644"
+      when:
+        - ood_enable_dex_ldap | bool
+        - ood_ldap_root_ca | default('') | length > 0
+
+    - name: OpenOnDemand | Ensure LDAP certificate hostname resolves locally
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '(^|\s){{ ood_ldap_hostname | regex_escape }}(\s|$)'
+        line: "{{ ood_private_ip }} {{ ood_ldap_hostname }}"
+      when:
+        - ood_enable_dex_ldap | bool
+        - ood_ldap_hostname == 'controller.cluster'
+
+    - name: OpenOnDemand | Mark static Dex login as enabled
+      ansible.builtin.set_fact:
+        ood_dex_static_enabled: "{{ ood_enable_dex_static | bool }}"
+
+    - name: OpenOnDemand | Generate static Dex password hash
+      ansible.builtin.command:
+        argv:
+          - htpasswd
+          - -bnBC
+          - "10"
+          - ""
+          - "{{ ood_opc_password }}"
+      register: ood_dex_static_hash_cmd
+      changed_when: false
+      no_log: true
+      when:
+        - ood_dex_static_enabled | bool
+        - ood_dex_static_hash | default('') | length == 0
+        - ood_opc_password | default('') | length > 0
+
+    - name: OpenOnDemand | Resolve static Dex password hash
+      ansible.builtin.set_fact:
+        ood_dex_static_password_hash_effective: >-
+          {{ (ood_dex_static_hash
+              if (ood_dex_static_hash | default('') | length > 0)
+              else ((ood_dex_static_hash_cmd.stdout | default('')) | regex_replace('^:', '') | trim))
+             | regex_replace('^\\$2y\\$', '$2a$') }}
+      no_log: true
+      when: ood_dex_static_enabled | bool
+
+    - name: OpenOnDemand | Validate Dex authentication inputs
+      ansible.builtin.assert:
+        that:
+          - ood_enable_dex_ldap | bool or ood_dex_static_enabled | bool
+          - not (ood_dex_static_enabled | bool) or (ood_dex_static_password_hash_effective | default('') | length > 0)
+          - ood_ldap_anonymous_bind | bool or (ood_ldap_bind_dn | length > 0 and ood_ldap_bind_pw | length > 0)
+        fail_msg: >-
+          Open OnDemand Dex login needs LDAP enabled or static login enabled.
+          For static login, set ood_opc_password or ood_dex_static_hash.
+          For non-anonymous LDAP bind, set ood_ldap_bind_dn and ood_ldap_bind_pw.
+
+    - name: Deploy ood_portal.yml for Dex login
+      ansible.builtin.template:
+        src: ood_portal.yml.j2
+        dest: /etc/ood/config/ood_portal.yml
         mode: "0644"
 
     - name: Generate/Update OOD Apache portal config
-      ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal"
+      ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure"
       changed_when: true
 
     - name: Ensure clusters.d directory exists
@@ -201,16 +312,61 @@
           node_uri: '/node'
           rnode_uri: '/rnode'
 
+    - name: OpenOnDemand | Update bc_desktop submit.yml.erb
+      ansible.builtin.copy:
+        dest: /var/www/ood/apps/sys/bc_desktop/submit.yml.erb
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          ---
+          batch_connect:
+            template: vnc
+          cluster: "myslurm"
+          script:
+            queue_name: <%= bc_queue %>
+
+    - name: OpenOnDemand | Update bc_desktop form.yml
+      ansible.builtin.copy:
+        dest: /var/www/ood/apps/sys/bc_desktop/form.yml
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          ---
+          cluster: "myslurm"
+    
+          attributes:
+            bc_vnc_idle: 0
+            bc_vnc_resolution:
+              required: true
+            desktop:
+              label: "Desktop Environment"
+              widget: select
+              options:
+                - "gnome"
+            node_type: null
+    
+          form:
+            - bc_vnc_idle
+            - desktop
+            - bc_account
+            - bc_num_hours
+            - bc_num_slots
+            - node_type
+            - bc_queue
+            - bc_vnc_resolution
+            - bc_email_on_started
+
     - name: OpenOnDemand | Regenerate Apache config
-      ansible.builtin.command: /opt/ood/ood-portal-generator/sbin/update_ood_portal
+      ansible.builtin.command: /opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure
       changed_when: true
 
-    - name: OpenOnDemand | Ensure /etc/shadow permissions
-      ansible.builtin.file:
-        path: /etc/shadow
-        owner: root
-        group: apache
-        mode: "0640"
+    - name: OpenOnDemand | Enable and restart Dex
+      ansible.builtin.service:
+        name: ondemand-dex
+        enabled: true
+        state: restarted
 
     - name: OpenOnDemand | Restart httpd
       ansible.builtin.service:

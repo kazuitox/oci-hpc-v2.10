@@ -1,0 +1,35 @@
+---
+ssl_cert_path: /etc/ssl/certs
+ssl_ca_cert: "{{ ssl_cert_path }}/cluster-ca.crt"
+ssl_cert_days: 3650
+
+ood_tls_cert: /etc/pki/tls/certs/ood-ip.crt
+ood_tls_key: /etc/pki/tls/private/ood-ip.key
+ood_tls_csr: /etc/pki/tls/certs/ood-ip.csr
+ood_tls_config: /etc/pki/tls/certs/ood-ip-openssl.cnf
+ood_tls_days: 825
+
+ood_enable_dex_ldap: "{{ ldap | default(true) | bool }}"
+ood_ldap_host: "{{ (openldap_host | default('controller.cluster')) ~ ':636' }}"
+ood_ldap_user_base_dn: dc=local
+ood_ldap_user_filter: "(objectClass=posixAccount)"
+ood_ldap_username_attr: uid
+ood_ldap_id_attr: uid
+ood_ldap_email_attr: uid
+ood_ldap_name_attr: gecos
+ood_ldap_preferred_username_attr: uid
+ood_ldap_root_ca: /etc/openldap/certs/cluster-ca.crt
+ood_ldap_insecure_skip_verify: false
+ood_ldap_anonymous_bind: true
+ood_ldap_bind_dn: ""
+ood_ldap_bind_pw: ""
+
+ood_enable_dex_static: true
+ood_dex_static_username: opc
+ood_dex_static_email: "{{ ood_dex_static_username }}@example.local"
+ood_dex_static_user_id: "{{ ood_dex_static_username }}"
+ood_dex_static_hash: ""
+
+ood_oidc_ssl_validate_server: "On"
+ood_user_map_match: "^([^@]+)"
+ood_host_regex: "(compute|desktop)-[\\w-]+"
