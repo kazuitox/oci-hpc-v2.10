@@ -178,7 +178,7 @@
       when: spack|default(false)|bool
     - include_role:
         name: openfoam
-      when: install_application|default(false)|bool and application|default('OpenFOAM') == 'OpenFOAM'
+      when: install_application|default(false)|bool and install_openfoam|default(false)|bool
     - include_role: 
         name: slurm
       when: slurm|default(false)|bool

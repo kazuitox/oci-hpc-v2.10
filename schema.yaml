@@ -49,8 +49,8 @@ variableGroups:
 - title: アプリケーション
   variables:
   - ${install_application}
-  - ${application}
-  - ${application_version}
+  - ${install_openfoam}
+  - ${openfoam_version}
 - title: Headnode オプション
   variables:
   - ${controller_shape}
@@ -1709,25 +1709,21 @@ variables:
     title: アプリケーションを追加
     default: false
     description: 共有領域にアプリケーションをインストールします。
-  application:
-    type: enum
-    title: 対象アプリケーション
-    default: OpenFOAM
-    enum:
-    - OpenFOAM
+  install_openfoam:
+    type: boolean
+    title: OpenFOAM をインストール
+    default: true
     visible: ${install_application}
-  application_version:
+  openfoam_version:
     type: enum
-    title: アプリケーションバージョン
+    title: OpenFOAM バージョン
     default: v2312
     enum:
     - v2312
     visible:
       and:
       - ${install_application}
-      - eq:
-        - ${application}
-        - OpenFOAM
+      - ${install_openfoam}
   enroot:
     type: boolean
     title: コンテナ化 GPU workload 用 Nvidia Enroot をインストール
