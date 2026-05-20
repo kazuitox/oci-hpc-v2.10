@@ -179,6 +179,9 @@
     - include_role:
         name: openfoam
       when: install_application|default(false)|bool and application|default('OpenFOAM') == 'OpenFOAM'
+    - include_role:
+        name: paraview
+      when: install_application|default(false)|bool and install_paraview|default(false)|bool
     - include_role: 
         name: slurm
       when: slurm|default(false)|bool

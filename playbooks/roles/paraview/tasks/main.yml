@@ -1,0 +1,67 @@
+---
+- name: Validate ParaView options
+  assert:
+    that:
+      - paraview_version == '5.11.2'
+    fail_msg: "Only ParaView 5.11.2 is supported."
+
+- name: Create ParaView profile
+  template:
+    src: paraview.sh.j2
+    dest: "{{ paraview_profile_path }}"
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+
+- name: Create ParaView directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: "{{ privilege_group_name | default('root') }}"
+    mode: '0775'
+  loop:
+    - "{{ paraview_prepost_dir }}"
+    - "{{ paraview_install_dir }}"
+  become: true
+  run_once: true
+
+- name: Check ParaView installation
+  stat:
+    path: "{{ paraview_install_dir }}/bin/paraview"
+  register: paraview_binary
+  become: true
+  run_once: true
+
+- name: Download ParaView archive
+  get_url:
+    url: "{{ paraview_download_url }}"
+    dest: "{{ paraview_archive_path }}"
+    mode: '0644'
+  become: true
+  run_once: true
+  when: not paraview_binary.stat.exists
+
+- name: Extract ParaView archive into install directory
+  unarchive:
+    src: "{{ paraview_archive_path }}"
+    dest: "{{ paraview_install_dir }}"
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+    creates: "{{ paraview_install_dir }}/bin/paraview"
+  become: true
+  run_once: true
+  when: not paraview_binary.stat.exists
+
+- name: Set ParaView permissions
+  file:
+    path: "{{ paraview_install_dir }}"
+    state: directory
+    owner: root
+    group: "{{ privilege_group_name | default('root') }}"
+    recurse: true
+  become: true
+  run_once: true
+  when: not paraview_binary.stat.exists

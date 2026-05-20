@@ -1,0 +1,12 @@
+---
+paraview_version: "5.11.2"
+paraview_release_series: "5.11"
+paraview_platform: "MPI-Linux-Python3.9-x86_64"
+paraview_archive_name: "ParaView-{{ paraview_version }}-{{ paraview_platform }}"
+paraview_archive_file: "{{ paraview_archive_name }}.tar.gz"
+paraview_download_url: "https://www.paraview.org/files/v{{ paraview_release_series }}/{{ paraview_archive_file }}"
+paraview_prepost_dir: "/share/prepost"
+paraview_install_dir: "{{ paraview_prepost_dir }}/paraview"
+paraview_download_dir: "/tmp"
+paraview_archive_path: "{{ paraview_download_dir }}/{{ paraview_archive_file }}"
+paraview_profile_path: "/etc/profile.d/paraview.sh"

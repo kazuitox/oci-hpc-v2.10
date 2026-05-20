@@ -57,6 +57,8 @@ resource "local_file" "inventory" {
     install_application = var.install_application,
     application = var.application,
     application_version = var.application_version,
+    install_paraview = var.install_paraview,
+    paraview_version = var.paraview_version,
     ldap = var.ldap,
     timezone = var.timezone,
     tags = var.tags,
