@@ -75,6 +75,7 @@ HPC_OL8
 | `slurm_ha` | バックアップ Slurm Controller を作成します。 |
 | `use_ood` | Open OnDemand をインストールします。 |
 | `install_application` | 共有領域に追加アプリケーションをインストールします。現時点では OpenFOAM v2312 と ParaView 5.11.2 を選択できます。 |
+| `ood_source_cidr` | Open OnDemand の HTTPS/443 へのアクセスを許可する送信元 CIDR。 |
 | `monitoring` | Grafana / Telegraf / InfluxDB によるシステム監視を有効化します。 |
 | `autoscaling_monitoring` | Autoscaling の状態を Grafana ダッシュボードで確認できるようにします。 |
 | `controller_object_storage_par` | RDMA NIC メトリックアップロード用の PAR を作成します。 |
@@ -274,6 +275,8 @@ cluster user add <name> --nossh --gid 9876
 ## Open OnDemand
 
 `use_ood` を有効にすると、Open OnDemand をインストールします。ユーザーはブラウザからファイル操作、ジョブ投入、アプリケーション実行を行えます。スタックは Open OnDemand 用の初期パスワードも生成し、構成に反映します。
+
+Open OnDemand の HTTPS/443 は `ood_source_cidr` で指定した送信元 CIDR からのみ許可されます。管理端末の固定グローバル IP など、必要な範囲に絞って指定してください。
 
 ## collect_logs.py
 

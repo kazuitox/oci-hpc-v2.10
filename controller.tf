@@ -435,6 +435,7 @@ resource "null_resource" "cluster" {
       cluster_block_volume_size = var.cluster_block_volume_size,
       cluster_block_volume_performance = var.cluster_block_volume_performance,
       ssh_cidr = var.ssh_cidr,
+      ood_source_cidr = local.ood_source_cidr,
       use_cluster_nfs = var.use_cluster_nfs,
       cluster_nfs_path = var.cluster_nfs_path,
       home_nfs = var.home_nfs,

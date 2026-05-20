@@ -30,6 +30,7 @@ locals {
 
 // vcn id derived either from created vcn or existing if specified
   vcn_id = var.use_existing_vcn ? var.vcn_id : element(concat(oci_core_vcn.vcn.*.id, [""]), 0)
+  ood_source_cidr = trimspace(var.ood_source_cidr) != "" ? trimspace(var.ood_source_cidr) : var.ssh_cidr
 
 // subnet id derived either from created subnet or existing if specified
 //  subnet_id = var.use_existing_vcn ? var.private_subnet_id : element(concat(oci_core_subnet.private-subnet.*.id, [""]), 0)

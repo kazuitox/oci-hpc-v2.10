@@ -70,7 +70,7 @@ resource "oci_core_security_list" "public-security-list" {
     for_each = var.use_ood ? [1] : []
     content {
       protocol = "6"
-      source   = "0.0.0.0/0"
+      source   = local.ood_source_cidr
       tcp_options {
         min = "443"
         max = "443"
@@ -259,4 +259,3 @@ resource "oci_dns_rrset" "fss-dns-round-robin" {
   scope   = "PRIVATE"
   view_id = data.oci_dns_views.dns_views.views[0].id
 }
-
