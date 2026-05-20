@@ -331,7 +331,7 @@
       when: spack|default(false)|bool
     - include_role:
         name: openfoam
-      when: install_application|default(false)|bool and application|default('OpenFOAM') == 'OpenFOAM'
+      when: install_application|default(false)|bool and install_openfoam|default(false)|bool
     - include_role:
         name: paraview
       when: install_application|default(false)|bool and install_paraview|default(false)|bool
