@@ -98,6 +98,7 @@ variable "cluster_block_volume_size" {default="${cluster_block_volume_size}"}
 variable "cluster_block_volume_performance" {default="${cluster_block_volume_performance}"}
 
 variable "ssh_cidr" {default="${ssh_cidr}"}
+variable "ood_source_cidr" {default="${ood_source_cidr}"}
 variable "controller_block" {default = "${controller_block}"}
 variable "login_block" {default = "${login_block}"}
 

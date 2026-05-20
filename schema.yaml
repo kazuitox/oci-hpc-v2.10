@@ -219,6 +219,10 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
+- title: Open OnDemand
+  variables:
+  - ${use_ood}
+  - ${ood_source_cidr}
 - title: ソフトウェア
   variables:
   - ${privilege_sudo}
@@ -226,7 +230,6 @@ variableGroups:
   - ${slurm}
   - ${slurm_nfs}
   - ${slurm_ha}
-  - ${use_ood}
   - ${rack_aware}
   - ${queue}
   - ${spack}
@@ -1662,8 +1665,14 @@ variables:
   use_ood:
     type: boolean
     title: Open OnDemand をインストール
-    default: false
+    default: true
     description: Open OnDemand は、HPC resources へのセキュアなブラウザベースアクセスを提供する Web ベース platform です。ユーザーは直接 SSH access せずに application の実行、file 管理、job 投入を行えます。
+  ood_source_cidr:
+    type: string
+    title: Open OnDemand へのアクセスを許可する CIDR 範囲
+    description: 'HTTPS/443 へのアクセスを許可する送信元 CIDR です。例: 203.0.113.10/32'
+    required: true
+    visible: ${use_ood}
   slurm_ha:
     type: boolean
     title: バックアップ Slurm Controller を作成

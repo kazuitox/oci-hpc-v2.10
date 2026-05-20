@@ -76,6 +76,7 @@ variable "additional_subnet" { default = "172.16.1.0/24" }
 variable "rdma_subnet" { default = "10.224.0.0/12" }
 variable "private_subnet" { default = "172.16.4.0/22" }
 variable "ssh_cidr" { default = "0.0.0.0/0" }
+variable "ood_source_cidr" { default = "" }
 variable "slurm" { default = true }
 variable "slurm_ha" { default = false }
 variable "login_node" { default = false }
