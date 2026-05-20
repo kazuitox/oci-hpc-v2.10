@@ -1,0 +1,21 @@
+[req]
+distinguished_name = dn
+prompt = no
+
+[dn]
+CN = {{ ood_servername }}
+
+[v3_server]
+basicConstraints = critical, CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+subjectAltName = @alt_names
+
+[alt_names]
+{% if ood_server_is_ip | bool %}
+IP.1 = {{ ood_servername }}
+{% else %}
+DNS.1 = {{ ood_servername }}
+{% endif %}

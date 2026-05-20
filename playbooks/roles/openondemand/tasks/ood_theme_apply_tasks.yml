@@ -26,6 +26,5 @@
     force: true
 
 - name: "OOD theme | Regenerate/Update OOD Apache portal config (safe re-run)"
-  ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal"
+  ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure"
   changed_when: true
-

@@ -1,0 +1,53 @@
+---
+servername: "{{ ood_servername }}"
+
+oidc_remote_user_claim: preferred_username
+user_map_match: '{{ ood_user_map_match }}'
+
+oidc_settings:
+  OIDCSSLValidateServer: '{{ ood_oidc_ssl_validate_server }}'
+
+ssl:
+  - 'SSLCertificateFile "{{ ood_tls_cert }}"'
+  - 'SSLCertificateKeyFile "{{ ood_tls_key }}"'
+
+dex:
+  client_id: '{{ ood_servername }}'
+{% if ood_enable_dex_ldap | bool %}
+  connectors:
+    - type: ldap
+      id: ldap
+      name: LDAP
+      config:
+        host: '{{ ood_effective_ldap_host }}'
+        insecureSkipVerify: {{ ood_ldap_insecure_skip_verify | bool | lower }}
+{% if ood_ldap_root_ca | default('') | length > 0 %}
+        rootCA: '{{ ood_ldap_root_ca }}'
+{% endif %}
+{% if not (ood_ldap_anonymous_bind | bool) %}
+        bindDN: '{{ ood_ldap_bind_dn }}'
+        bindPW: '{{ ood_ldap_bind_pw }}'
+{% endif %}
+        userSearch:
+          baseDN: '{{ ood_ldap_user_base_dn }}'
+          filter: "{{ ood_ldap_user_filter }}"
+          username: '{{ ood_ldap_username_attr }}'
+          idAttr: '{{ ood_ldap_id_attr }}'
+          emailAttr: '{{ ood_ldap_email_attr }}'
+          nameAttr: '{{ ood_ldap_name_attr }}'
+          preferredUsernameAttr: '{{ ood_ldap_preferred_username_attr }}'
+{% endif %}
+{% if ood_dex_static_enabled | bool %}
+  static_passwords:
+    - email: '{{ ood_dex_static_email }}'
+      hash: '{{ ood_dex_static_password_hash_effective }}'
+      username: '{{ ood_dex_static_username }}'
+      userID: '{{ ood_dex_static_user_id }}'
+{% endif %}
+  frontend:
+    theme: ondemand
+    dir: /usr/share/ondemand-dex/web
+
+host_regex: '{{ ood_host_regex }}'
+node_uri: '/node'
+rnode_uri: '/rnode'
