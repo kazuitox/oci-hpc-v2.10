@@ -1,0 +1,11 @@
+#!/bin/bash
+for mpi_vars in /usr/mpi/gcc/*/bin/mpivars.sh; do
+    if [ -f "${mpi_vars}" ]; then
+        source "${mpi_vars}"
+        break
+    fi
+done
+
+if [ -f "{{ openfoam_project_dir }}/etc/bashrc" ]; then
+    source "{{ openfoam_project_dir }}/etc/bashrc"
+fi

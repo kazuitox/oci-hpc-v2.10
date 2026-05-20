@@ -1,0 +1,10 @@
+---
+openfoam_application: "{{ application | default('OpenFOAM') }}"
+openfoam_version: "{{ application_version | default('v2312') }}"
+openfoam_root: "{{ nfs_target_path if create_fss | default(false) | bool else (cluster_nfs_path if cluster_nfs | default(false) | bool else '/opt') }}/OpenFOAM"
+openfoam_project_dir: "{{ openfoam_root }}/OpenFOAM-{{ openfoam_version }}"
+openfoam_thirdparty_dir: "{{ openfoam_root }}/ThirdParty-{{ openfoam_version }}"
+openfoam_source_url: "https://dl.openfoam.com/source/{{ openfoam_version }}/OpenFOAM-{{ openfoam_version }}.tgz"
+openfoam_thirdparty_url: "https://dl.openfoam.com/source/{{ openfoam_version }}/ThirdParty-{{ openfoam_version }}.tgz"
+openfoam_build_jobs: "{{ [ansible_processor_vcpus | default(8) | int, 8] | min }}"
+openfoam_build_marker: "{{ openfoam_project_dir }}/platforms/linux64GccDPInt32Opt/bin/icoFoam"
