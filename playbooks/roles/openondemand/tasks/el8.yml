@@ -147,9 +147,11 @@
           ---
           v2:
             metadata:
-              title: "OCI HPC Cluster"
+              title: "ログインノード"
+              hidden: false
             login:
-              host: "{{ ood_private_ip }}"
+              host: "{{ ood_servername }}"
+              default: true
             job:
               adapter: "slurm"
               bin: "/usr/bin"
@@ -166,6 +168,9 @@
           - "oj-redwood-min.css"
           - "favicon.ico"
         ood_ux_config_url: "https://raw.githubusercontent.com/koiker/oci-hpc/master/artifacts/ondemand/oracle_ux.yml"
+
+    - name: OpenOnDemand | Apply dashboard customizations
+      ansible.builtin.include_tasks: ood_dashboard_customizations.yml
 
     - name: Apache config test
       ansible.builtin.command: apachectl configtest
@@ -186,59 +191,13 @@
       until: httpd_active.stdout.strip() == "active"
       changed_when: false
 
-    - name: OpenOnDemand | Update bc_desktop submit.yml.erb
-      ansible.builtin.copy:
-        dest: /var/www/ood/apps/sys/bc_desktop/submit.yml.erb
-        owner: root
-        group: root
-        mode: "0644"
-        content: |
-          ---
-          batch_connect:
-            template: vnc
-          cluster: "myslurm"
-          script:
-            queue_name: <%= bc_queue %>
-
-    - name: OpenOnDemand | Update bc_desktop form.yml
-      ansible.builtin.copy:
-        dest: /var/www/ood/apps/sys/bc_desktop/form.yml
-        owner: root
-        group: root
-        mode: "0644"
-        content: |
-          ---
-          cluster: "myslurm"
-    
-          attributes:
-            bc_vnc_idle: 0
-            bc_vnc_resolution:
-              required: true
-            desktop:
-              label: "Desktop Environment"
-              widget: select
-              options:
-                - "gnome"
-            node_type: null
-    
-          form:
-            - bc_vnc_idle
-            - desktop
-            - bc_account
-            - bc_num_hours
-            - bc_num_slots
-            - node_type
-            - bc_queue
-            - bc_vnc_resolution
-            - bc_email_on_started
-
     - name: OpenOnDemand | Add node routing settings to ood_portal.yml
       ansible.builtin.blockinfile:
         path: /etc/ood/config/ood_portal.yml
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR OOD NODE ROUTING"
         insertafter: EOF
         block: |
-          host_regex: 'compute-[\w-]+'
+          host_regex: 'desktop-[\w-]+'
           node_uri: '/node'
           rnode_uri: '/rnode'
 

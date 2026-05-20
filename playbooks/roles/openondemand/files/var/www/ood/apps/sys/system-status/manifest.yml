@@ -1,0 +1,8 @@
+---
+name: System Status
+description: |-
+  The Open OnDemand System Status App
+category: "04 クラスタ管理"
+icon: fa://tachometer
+url: system-status
+new_window: false

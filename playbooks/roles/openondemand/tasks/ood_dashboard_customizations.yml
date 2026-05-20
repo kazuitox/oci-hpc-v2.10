@@ -1,0 +1,52 @@
+---
+- name: OpenOnDemand dashboard | Ensure config override directories exist
+  ansible.builtin.file:
+    path: "/etc/ood/config/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - ondemand.d
+    - locales
+
+- name: OpenOnDemand dashboard | Install config overrides
+  ansible.builtin.copy:
+    src: "etc/ood/config/{{ item }}"
+    dest: "/etc/ood/config/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - ondemand.d/ondemand.yml
+    - locales/en.yml
+
+- name: OpenOnDemand dashboard | Ensure system app override directories exist
+  ansible.builtin.file:
+    path: "/var/www/ood/apps/sys/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - activejobs
+    - bc_desktop
+    - dashboard/app/apps
+    - files
+    - myjobs
+    - shell
+    - system-status
+
+- name: OpenOnDemand dashboard | Install system app overrides
+  ansible.builtin.copy:
+    src: "var/www/ood/apps/sys/{{ item }}"
+    dest: "/var/www/ood/apps/sys/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - activejobs/manifest.yml
+    - bc_desktop/form.yml
+    - bc_desktop/manifest.yml
+    - bc_desktop/submit.yml.erb
+    - dashboard/app/apps/ood_app.rb
+    - files/manifest.yml
+    - myjobs/manifest.yml
+    - shell/manifest.yml
+    - system-status/manifest.yml

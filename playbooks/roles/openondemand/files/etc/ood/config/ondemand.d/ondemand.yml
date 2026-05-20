@@ -1,0 +1,21 @@
+# /etc/ood/config/ondemand.d/ondemand.yml
+---
+dashboard_title: "OOD CONFIG TEST"
+
+pinned_apps:
+  - 'sys/files'
+  - 'sys/bc_desktop'
+  - 'sys/shell'
+  - 'sys/activejobs'
+  - 'sys/myjobs'
+  - 'sys/system-status'
+
+pinned_apps_menu_length: 15
+pinned_apps_group_by: category
+
+dashboard_layout:
+  rows:
+    - columns:
+        - width: 12
+          widgets:
+            - pinned_apps

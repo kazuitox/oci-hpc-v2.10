@@ -1,0 +1,8 @@
+---
+name: Active Jobs
+category: "03 ジョブ"
+description: |-
+  View jobs currently running on available clusters configured for OnDemand.
+icon: fa://clock-o
+url: activejobs
+new_window: false
