@@ -1,0 +1,9 @@
+#!/bin/bash
+export PARAVIEW_HOME="{{ paraview_install_dir }}"
+
+if [ -d "${PARAVIEW_HOME}/bin" ]; then
+    case ":${PATH}:" in
+        *":${PARAVIEW_HOME}/bin:"*) ;;
+        *) export PATH="${PARAVIEW_HOME}/bin:${PATH}" ;;
+    esac
+fi

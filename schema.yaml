@@ -2,7 +2,7 @@
 title: HPC クラスタ
 description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
-version: '2026042701'
+version: '2026052001'
 informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
@@ -46,6 +46,11 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
+- title: アプリケーション
+  variables:
+  - ${install_application}
+  - ${install_paraview}
+  - ${paraview_version}
 - title: Headnode オプション
   variables:
   - ${controller_shape}
@@ -1699,6 +1704,26 @@ variables:
     title: Spack package manager をインストール
     default: false
     description: Spack package manager をインストールします。shared folder が必要です
+  install_application:
+    type: boolean
+    title: アプリケーションを追加
+    default: false
+    description: 共有領域にアプリケーションをインストールします。
+  install_paraview:
+    type: boolean
+    title: ParaView をインストール
+    default: true
+    visible: ${install_application}
+  paraview_version:
+    type: enum
+    title: ParaView バージョン
+    default: '5.11.2'
+    enum:
+    - '5.11.2'
+    visible:
+      and:
+      - ${install_application}
+      - ${install_paraview}
   enroot:
     type: boolean
     title: コンテナ化 GPU workload 用 Nvidia Enroot をインストール
