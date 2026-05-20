@@ -216,9 +216,10 @@
     - name: OpenOnDemand | Resolve static Dex password hash
       ansible.builtin.set_fact:
         ood_dex_static_password_hash_effective: >-
-          {{ ood_dex_static_hash
-             if (ood_dex_static_hash | default('') | length > 0)
-             else ((ood_dex_static_hash_cmd.stdout | default('')) | regex_replace('^:', '') | trim) }}
+          {{ (ood_dex_static_hash
+              if (ood_dex_static_hash | default('') | length > 0)
+              else ((ood_dex_static_hash_cmd.stdout | default('')) | regex_replace('^:', '') | trim))
+             | regex_replace('^\\$2y\\$', '$2a$') }}
       no_log: true
       when: ood_dex_static_enabled | bool
 

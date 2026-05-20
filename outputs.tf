@@ -17,3 +17,7 @@ output "login" {
 output "ood_opc_password" {
   value = nonsensitive(random_password.ood_opc_password.result)
 }
+
+output "ood_opc_username" {
+  value = "opc@example.local"
+}
