@@ -8,6 +8,7 @@ ood_tls_key: /etc/pki/tls/private/ood-ip.key
 ood_tls_csr: /etc/pki/tls/certs/ood-ip.csr
 ood_tls_config: /etc/pki/tls/certs/ood-ip-openssl.cnf
 ood_tls_days: 825
+ood_public_hostname: ""
 
 ood_enable_dex_ldap: "{{ ldap | default(true) | bool }}"
 ood_ldap_host: "{{ (openldap_host | default('controller.cluster')) ~ ':636' }}"
@@ -31,5 +32,5 @@ ood_dex_static_user_id: "{{ ood_dex_static_username }}"
 ood_dex_static_hash: ""
 
 ood_oidc_ssl_validate_server: "On"
-ood_user_map_match: "^([^@]+)"
+ood_user_map_match: "^(.+)$"
 ood_host_regex: "(compute|desktop)-[\\w-]+"

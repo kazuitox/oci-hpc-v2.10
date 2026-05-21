@@ -3,13 +3,23 @@
     - name: Set facts | Resolve servername/private_ip for OOD
       ansible.builtin.set_fact:
         ood_servername: >-
-          {{ controller_public_ip
-             | default(ansible_host
-             | default(ansible_default_ipv4.address)) }}
-        ood_private_ip: "{{ ansible_host | default(ansible_default_ipv4.address) }}"
+          {{ ood_public_hostname
+             if (ood_public_hostname | default('') | length > 0)
+             else (
+               ansible_fqdn
+               if (ansible_fqdn | default('') | length > 0
+                  and ansible_fqdn not in ['localhost', 'localhost.localdomain'])
+               else (controller_public_ip
+                     | default(ansible_host
+                     | default((ansible_default_ipv4 | default({})).address | default(''))))
+             ) }}
+        ood_private_ip: "{{ (ansible_default_ipv4 | default({})).address | default(ansible_host) }}"
         ood_effective_ldap_host: "{{ ood_ldap_host }}"
         ood_ldap_hostname: "{{ ood_ldap_host.split(':')[0] }}"
-        ood_server_is_ip: "{{ (controller_public_ip | default(ansible_host | default(ansible_default_ipv4.address))) is match('^([0-9]{1,3}\\.){3}[0-9]{1,3}$') }}"
+
+    - name: Set facts | Classify OOD servername
+      ansible.builtin.set_fact:
+        ood_server_is_ip: "{{ ood_servername is match('^([0-9]{1,3}\\.){3}[0-9]{1,3}$') }}"
 
     - name: OpenOnDemand | Set opc password when provided
       ansible.builtin.user:
@@ -107,10 +117,23 @@
       changed_when: false
       failed_when: false
 
+    - name: OpenOnDemand | Verify existing TLS certificate against cluster CA
+      ansible.builtin.command:
+        argv:
+          - openssl
+          - verify
+          - -CAfile
+          - "{{ ssl_ca_cert }}"
+          - "{{ ood_tls_cert }}"
+      register: ood_existing_tls_verify
+      changed_when: false
+      failed_when: false
+
     - name: OpenOnDemand | Decide whether to regenerate TLS certificate
       ansible.builtin.set_fact:
         ood_tls_needs_regen: >-
           {{ ood_existing_tls_cert.rc != 0
+             or ood_existing_tls_verify.rc != 0
              or 'CA:FALSE' not in ood_existing_tls_cert.stdout
              or (ood_server_is_ip | bool and ('IP Address:' ~ ood_servername) not in ood_existing_tls_cert.stdout)
              or (not (ood_server_is_ip | bool) and ('DNS:' ~ ood_servername) not in ood_existing_tls_cert.stdout) }}
@@ -164,6 +187,16 @@
         path: /etc/ood/config
         state: directory
         mode: "0755"
+
+    - name: OpenOnDemand | Ensure OOD public hostname resolves locally
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} ANSIBLE MANAGED BLOCK FOR OOD PUBLIC HOSTNAME"
+        block: |
+          {{ ood_private_ip }} {{ ood_servername }}
+      when:
+        - not (ood_server_is_ip | bool)
+        - ood_private_ip | default('') | length > 0
 
     - name: OpenOnDemand | Ensure OpenLDAP certificate directory exists
       ansible.builtin.file:
