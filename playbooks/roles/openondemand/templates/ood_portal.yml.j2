@@ -1,7 +1,7 @@
 ---
 servername: "{{ ood_servername }}"
 
-oidc_remote_user_claim: preferred_username
+oidc_remote_user_claim: '{{ ood_oidc_remote_user_claim }}'
 user_map_match: '{{ ood_user_map_match }}'
 
 oidc_settings:
