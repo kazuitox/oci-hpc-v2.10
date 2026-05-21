@@ -1073,7 +1073,7 @@ variables:
     title: ベアメタルのRoCEv2対応インスタンスを利用
     type: boolean
     description: RoCEv2 Cluster Network を使用します
-    default: true
+    default: false
   compute_cluster:
     title: Cluster Network の代わりに Compute Cluster を使用
     type: boolean
@@ -1118,7 +1118,7 @@ variables:
   instance_pool_shape:
     title: Compute node の Shape
     required: true
-    default: VM.Standard.E4.Flex
+    default: VM.Standard.E6.Flex
     type: oci:core:instanceshape:name
     dependsOn:
       compartmentId: ${targetCompartment}
@@ -1132,7 +1132,7 @@ variables:
     description: Flex Shape の OCPU 数
     minimum: 1
     maximum: 64
-    default: 2
+    default: 64
     visible:
       and:
       - not:
@@ -1215,7 +1215,7 @@ variables:
     description: Flex Shape のメモリサイズ。コアあたり最低 1GB。
     minimum: 1
     maximum: 1024
-    default: 16
+    default: 96
     visible:
       and:
       - and:
