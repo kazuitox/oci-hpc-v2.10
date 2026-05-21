@@ -101,6 +101,30 @@ resource "oci_core_security_list" "public-security-list" {
   }
 }
 
+resource "oci_core_network_security_group" "controller_ood_nsg" {
+  count          = (var.use_ood && !var.private_deployment) ? 1 : 0
+  compartment_id = var.targetCompartment
+  vcn_id         = local.vcn_id
+  display_name   = "${local.cluster_name}_controller_ood_nsg"
+}
+
+resource "oci_core_network_security_group_security_rule" "controller_ood_self_public_ingress" {
+  count                     = (var.use_ood && !var.private_deployment) ? 1 : 0
+  network_security_group_id = oci_core_network_security_group.controller_ood_nsg[0].id
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source_type               = "CIDR_BLOCK"
+  source                    = "${oci_core_instance.controller.public_ip}/32"
+  description               = "Allow controller self access to Open OnDemand via public IP"
+
+  tcp_options {
+    destination_port_range {
+      min = 443
+      max = 443
+    }
+  }
+}
+
 resource "oci_core_internet_gateway" "ig1" {
   count          = (var.use_existing_vcn || var.private_deployment) ? 0 : 1
   vcn_id         = oci_core_vcn.vcn[0].id

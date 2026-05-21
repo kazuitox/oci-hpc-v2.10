@@ -3,15 +3,13 @@
     - name: Set facts | Resolve servername/private_ip for OOD
       ansible.builtin.set_fact:
         ood_servername: >-
-          {{ ood_public_hostname
-             if (ood_public_hostname | default('') | length > 0)
+          {{ (ood_public_hostname | trim)
+             if (ood_public_hostname | default('') | trim | length > 0)
              else (
-               ansible_fqdn
-               if (ansible_fqdn | default('') | length > 0
-                  and ansible_fqdn not in ['localhost', 'localhost.localdomain'])
-               else (controller_public_ip
-                     | default(ansible_host
-                     | default((ansible_default_ipv4 | default({})).address | default(''))))
+               (controller_public_ip | trim)
+               if (controller_public_ip | default('') | trim | length > 0)
+               else (ansible_host
+                     | default((ansible_default_ipv4 | default({})).address | default('')))
              ) }}
         ood_private_ip: "{{ (ansible_default_ipv4 | default({})).address | default(ansible_host) }}"
         ood_effective_ldap_host: "{{ ood_ldap_host }}"

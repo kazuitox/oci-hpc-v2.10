@@ -92,8 +92,11 @@ resource "oci_core_instance" "controller" {
   }
 
   create_vnic_details {
-    subnet_id = local.controller_subnet_id
+    subnet_id        = local.controller_subnet_id
     assign_public_ip = local.controller_bool_ip
+    nsg_ids          = (var.use_ood && !var.private_deployment) ? [
+      oci_core_network_security_group.controller_ood_nsg[0].id
+    ] : null
   }
 } 
 
