@@ -267,6 +267,8 @@ variableGroups:
   - ${marketplace_version_id}
   - ${compute_image_operating_system}
   - ${compute_image_operating_system_version}
+  - ${application}
+  - ${application_version}
   - ${controller_boot_volume_backup_period}
   - ${controller_boot_volume_backup_retention_seconds}
   - ${controller_boot_volume_backup_time_zone}
@@ -1720,10 +1722,18 @@ variables:
     title: アプリケーションを追加
     default: false
     description: 共有領域にアプリケーションをインストールします。
+  application:
+    type: string
+    default: OpenFOAM
+    visible: false
+  application_version:
+    type: string
+    default: v2312
+    visible: false
   install_openfoam:
     type: boolean
     title: OpenFOAM をインストール
-    default: true
+    default: false
     visible: ${install_application}
   openfoam_version:
     type: enum
@@ -1738,7 +1748,7 @@ variables:
   install_paraview:
     type: boolean
     title: ParaView をインストール
-    default: true
+    default: false
     visible: ${install_application}
   paraview_version:
     type: enum
