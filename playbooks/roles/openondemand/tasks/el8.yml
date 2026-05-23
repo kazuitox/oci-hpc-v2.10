@@ -271,8 +271,37 @@
         dest: /etc/ood/config/ood_portal.yml
         mode: "0644"
 
+    - name: OpenOnDemand | Ensure httpd systemd drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/system/httpd.service.d
+        state: directory
+        mode: "0755"
+
+    - name: OpenOnDemand | Override httpd portal generator command
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/httpd.service.d/zz-ood-portal-insecure.conf
+        mode: "0644"
+        content: |
+          [Service]
+          ExecStartPre=
+          ExecStartPre=-/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure --force
+          ExecReload=
+          ExecReload=-/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure --force
+          ExecReload=/usr/sbin/httpd $OPTIONS -k graceful
+      register: ood_httpd_portal_dropin
+
+    - name: OpenOnDemand | Reload systemd for httpd portal override
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: ood_httpd_portal_dropin.changed
+
+    - name: OpenOnDemand | Reset httpd and Dex failed state
+      ansible.builtin.command: systemctl reset-failed httpd ondemand-dex
+      changed_when: false
+      failed_when: false
+
     - name: Generate/Update OOD Apache portal config
-      ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure"
+      ansible.builtin.command: "/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure --force"
       changed_when: true
 
     - name: Ensure clusters.d directory exists
@@ -387,7 +416,7 @@
             - bc_queue
 
     - name: OpenOnDemand | Regenerate Apache config
-      ansible.builtin.command: /opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure
+      ansible.builtin.command: /opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure --force
       changed_when: true
 
     - name: OpenOnDemand | Enable and restart Dex
