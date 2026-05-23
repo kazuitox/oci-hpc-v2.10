@@ -11,7 +11,7 @@ source:
 locale: ja
 outputs:
   controller:
-    title: controller インスタンスのパブリック IP
+    title: controller インスタンスの HTTPS URL
     type: copyableString
     visible: true
 variableGroups:

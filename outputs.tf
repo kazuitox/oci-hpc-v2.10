@@ -1,5 +1,5 @@
 output "controller" {
-  value = local.host
+  value = format("https://%s", local.host)
 }
 
 output "private_ips" {
