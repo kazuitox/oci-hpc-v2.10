@@ -226,7 +226,7 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: Open OnDemand
+- title: HPC Webポータル
   variables:
   - ${use_ood}
   - ${ood_source_cidr}
