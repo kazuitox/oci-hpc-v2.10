@@ -10,6 +10,7 @@ resource "oci_core_security_list" "internal-security-list" {
   count          = var.use_existing_vcn ? 0 : 1
   vcn_id         = oci_core_vcn.vcn[0].id
   compartment_id = var.targetCompartment
+  display_name   = "${local.cluster_name}_private_security_list"
 
   ingress_security_rules {
     protocol = "all"
@@ -42,6 +43,7 @@ resource "oci_core_security_list" "public-security-list" {
   count          = var.use_existing_vcn ? 0 : 1
   vcn_id         = oci_core_vcn.vcn[0].id
   compartment_id = var.targetCompartment
+  display_name   = "${local.cluster_name}_public_security_list"
 
   ingress_security_rules {
     protocol = "all"
