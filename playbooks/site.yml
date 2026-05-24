@@ -352,3 +352,13 @@
     - include_role:
         name: desktop
       when: use_ood|default(false)|bool
+
+- hosts: controller
+  become: true
+  tasks:
+    - include_role:
+        name: custom-image-lite-playbook
+      when:
+        - slurm|default(false)|bool
+        - autoscaling|default(false)|bool
+        - import_compute_image_from_object_storage|default(false)|bool

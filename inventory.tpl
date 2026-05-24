@@ -49,6 +49,7 @@ controller_mount_ip = ${controller_mount_ip}
 login_mount_ip = ${login_mount_ip}
 cluster_mount_ip = ${cluster_mount_ip}
 autoscaling = ${autoscaling}
+import_compute_image_from_object_storage=${import_compute_image_from_object_storage}
 cluster_name = ${cluster_name}
 shape=${shape}
 add_nfs=${add_nfs}

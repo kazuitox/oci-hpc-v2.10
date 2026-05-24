@@ -291,6 +291,7 @@ resource "null_resource" "cluster" {
       login_mount_ip = local.login_mount_ip,
       cluster_mount_ip = local.mount_ip,
       autoscaling = var.autoscaling,
+      import_compute_image_from_object_storage = var.import_compute_image_from_object_storage,
       cluster_name = local.cluster_name,
       shape = local.shape,
       instance_pool_ocpus = local.instance_pool_ocpus,

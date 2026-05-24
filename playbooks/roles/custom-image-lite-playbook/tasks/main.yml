@@ -1,0 +1,6 @@
+---
+- name: Switch autoscaling node setup playbooks to lite variant
+  ansible.builtin.command: /opt/oci-hpc/bin/switch_playbook.sh lite
+  args:
+    creates: /opt/oci-hpc/playbooks/new_nodes.yml.normal
+  changed_when: true
