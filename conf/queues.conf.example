@@ -55,7 +55,7 @@
         - name: desktop-default
           default: true
           shape: VM.Standard.E6.Flex
-          instance_keyword: desktop
+          instance_keyword: small
           permanent: false
           cluster_network: false
           compute_cluster: false
