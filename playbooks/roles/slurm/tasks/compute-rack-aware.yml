@@ -91,7 +91,7 @@
 
 - name: Get nodes from Inactive Switch
   vars:
-    - keyword: "{% for partition in queues %}{% for instance in partition.instance_types %}{% if instance.name == instance_type %}{{instance.instance_keyword}}{% endif %}{% endfor %}{% endfor %}"
+    keyword: "{% for partition in queues %}{% for instance in partition.instance_types %}{% if instance.name == instance_type %}{{instance.instance_keyword}}{% endif %}{% endfor %}{% endfor %}"
   shell: "cat {{ slurm_conf_path }}/topology.conf | grep \"SwitchName=inactive-{{queue}}-{{keyword}}\""
   register: inactive_switch
   run_once: true
@@ -129,7 +129,7 @@
 
 - name: Get current nodes in Switch hostlist
   vars:
-    - switch_list_condensed: "{{item.stdout.split('Nodes=')[1]}}"
+    switch_list_condensed: "{{item.stdout.split('Nodes=')[1]}}"
   command: "scontrol show hostname {{switch_list_condensed }}"
   register: switch_hostlist
   delegate_to: 127.0.0.1
@@ -186,7 +186,7 @@
 
 - name: Get inactive_hostlist
   vars:
-    - inactive_list_condensed: "{{inactive_switch.stdout.split('Nodes=')[1]}}"
+    inactive_list_condensed: "{{inactive_switch.stdout.split('Nodes=')[1]}}"
   command: "scontrol show hostname {{inactive_list_condensed }}"
   register: inactive_hostlist
   delegate_to: 127.0.0.1
@@ -199,8 +199,8 @@
 - name: remove nodes from inactive
   become: true
   vars:
-    - inactive_list: "{{inactive_switch.stdout.split('Nodes=')[1].split(',')}}"
-    - keyword: "{% for partition in queues %}{% for instance in partition.instance_types %}{% if instance.name == instance_type %}{{instance.instance_keyword}}{% endif %}{% endfor %}{% endfor %}"
+    inactive_list: "{{inactive_switch.stdout.split('Nodes=')[1].split(',')}}"
+    keyword: "{% for partition in queues %}{% for instance in partition.instance_types %}{% if instance.name == instance_type %}{{instance.instance_keyword}}{% endif %}{% endfor %}{% endfor %}"
   lineinfile:
     path: "{{ slurm_conf_path }}/topology.conf"
     regexp: "SwitchName=inactive-{{queue}}-{{keyword}}\\sNodes.*"

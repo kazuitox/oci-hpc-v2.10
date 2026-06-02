@@ -92,9 +92,9 @@
     dest: /etc/hosts
     marker: "# {mark} ANSIBLE MANAGED BLOCK {{ cluster_name }}"
     state: absent
-  delegate_to: "{{ groups['slurm_backup'][0] }}"
+  delegate_to: "{{ (groups.get('slurm_backup', []) | first) | default('localhost', true) }}"
   run_once: true
-  when: destroy|bool and (groups['slurm_backup']|length > 0)|bool
+  when: destroy|bool and (groups.get('slurm_backup', [])|length > 0)|bool
 
 - name: remove cluster from etc-host on login
   become: true
@@ -102,6 +102,6 @@
     dest: /etc/hosts
     marker: "# {mark} ANSIBLE MANAGED BLOCK {{ cluster_name }}"
     state: absent
-  delegate_to: "{{ groups['login'][0] }}"
+  delegate_to: "{{ (groups.get('login', []) | first) | default('localhost', true) }}"
   run_once: true
-  when: destroy|bool and (groups['login']|length > 0)|bool
+  when: destroy|bool and (groups.get('login', [])|length > 0)|bool

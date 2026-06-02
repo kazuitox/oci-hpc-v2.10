@@ -63,7 +63,7 @@
 
 - name: Download slurm .deb
   get_url:
-    url: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/lQBJduG5m6xQWauRMPkouaOoliEHbbDIqgfQXou050XAcDav2UveFlRjvFv-0JIn/n/hpc_limited_availability/b/source/o/slurm/slurm-{{slurm_version}}_{{ansible_distribution_version}}_amd64.deb"
+    url: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/lQBJduG5m6xQWauRMPkouaOoliEHbbDIqgfQXou050XAcDav2UveFlRjvFv-0JIn/n/hpc_limited_availability/b/source/o/slurm/{{ slurm_deb_package }}"
     dest: "{{ download_path }}/slurm_rpms/"
   when: ansible_os_family == 'Debian' and download_path == '/tmp'
   
@@ -76,7 +76,7 @@
 
 - name: Download slurm .deb
   get_url:
-    url: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/lQBJduG5m6xQWauRMPkouaOoliEHbbDIqgfQXou050XAcDav2UveFlRjvFv-0JIn/n/hpc_limited_availability/b/source/o/slurm/slurm-{{slurm_version}}_{{ansible_distribution_version}}_amd64.deb"
+    url: "https://objectstorage.eu-frankfurt-1.oraclecloud.com/p/lQBJduG5m6xQWauRMPkouaOoliEHbbDIqgfQXou050XAcDav2UveFlRjvFv-0JIn/n/hpc_limited_availability/b/source/o/slurm/{{ slurm_deb_package }}"
     dest: "{{ download_path }}/slurm_rpms"
   when: ansible_os_family == 'Debian' and download_path != '/tmp'
   delegate_to: 127.0.0.1
@@ -94,7 +94,7 @@
 - name: Install .deb
   vars:
     deb_name:
-      - "{{ download_path }}/slurm_rpms/slurm-{{slurm_version}}_{{ansible_distribution_version}}_amd64.deb"
+      - "{{ download_path }}/slurm_rpms/{{ slurm_deb_package }}"
     package_state: present
   include_role:
     name: safe_yum

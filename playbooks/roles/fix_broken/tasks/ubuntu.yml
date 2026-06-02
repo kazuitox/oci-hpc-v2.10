@@ -54,15 +54,26 @@
   delay: 10
   until: result.stdout | int == 0
 
+- name: Check Oracle kernel packages
+  become: true
+  command: "dpkg-query -W -f='${Status}' {{ item }}"
+  register: oracle_kernel_packages
+  changed_when: false
+  failed_when: false
+  with_items:
+    - linux-oracle
+    - linux-headers-oracle
+    - linux-image-oracle
+
 - name: Mark packages
   become: true
   dpkg_selections:
-    name: "{{item}}"
+    name: "{{ item.item }}"
     selection: hold
-  with_items:
-    - linux-oracle 
-    - linux-headers-oracle 
-    - linux-image-oracle
+  when:
+    - item.rc == 0
+    - "'install ok installed' in item.stdout"
+  with_items: "{{ oracle_kernel_packages.results }}"
 
 - name: Ensure apt process is completed
   become: true

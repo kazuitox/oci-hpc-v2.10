@@ -5,6 +5,7 @@ slurm_conf_file: slurm.conf.j2
 slurmdbd_conf_file: slurmdbd.conf.j2
 
 cgroup_conf_file: cgroup.conf
+slurm_deb_distribution_version: "{{ '22.04' if ansible_distribution_version == '24.04' else ansible_distribution_version }}"
 
 munge_packages:
   - munge

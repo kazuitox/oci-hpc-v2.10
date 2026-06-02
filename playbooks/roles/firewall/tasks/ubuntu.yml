@@ -1,10 +1,14 @@
 ---
 
+- name: Gather service facts
+  service_facts:
+
 - name: disable ufw
   service: 
     name: ufw
     state: stopped
     enabled: no
+  when: "'ufw.service' in ansible_facts.services"
 
 # it still need update to iptables rules to accept traffic or else mpi traffic fails 
 
@@ -18,4 +22,3 @@
 
 - name: execute off-iptables.sh
   command: "sudo /tmp/off-iptables.sh"
-

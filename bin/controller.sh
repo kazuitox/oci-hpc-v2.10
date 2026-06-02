@@ -76,7 +76,9 @@ elif [ $ID == "debian" ] || [ $ID == "ubuntu" ] ; then
     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
   fi 
 
-  sudo sed -i 's/"1"/"0"/g' /etc/apt/apt.conf.d/20auto-upgrades
+  if [ -f /etc/apt/apt.conf.d/20auto-upgrades ] ; then
+    sudo sed -i 's/"1"/"0"/g' /etc/apt/apt.conf.d/20auto-upgrades
+  fi
   sudo apt purge -y --auto-remove unattended-upgrades
   sudo systemctl disable apt-daily-upgrade.timer
   sudo systemctl mask apt-daily-upgrade.service
@@ -85,7 +87,11 @@ elif [ $ID == "debian" ] || [ $ID == "ubuntu" ] ; then
 
   sleep 10s
 
-  sudo apt-mark hold linux-oracle linux-headers-oracle linux-image-oracle
+  for pkg in linux-oracle linux-headers-oracle linux-image-oracle; do
+    if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed" ; then
+      sudo apt-mark hold "$pkg"
+    fi
+  done
 
   fix_apt
   sleep 10s
@@ -104,10 +110,11 @@ elif [ $ID == "debian" ] || [ $ID == "ubuntu" ] ; then
   fi
   fix_apt
 
-  if [ $ID == "ubuntu" ] && [ $VERSION_ID == "22.04" ] ; then
-    sudo sed -i 's/#$nrconf{restart} = '"'"'i'"'"';/$nrconf{restart} = '"'"'a'"'"';/g' /etc/needrestart/needrestart.conf
-    sudo apt-get -y install python3 python3-netaddr python3-pip
-    sudo ln -s /usr/bin/python3 /usr/bin/python
+  if [ $ID == "ubuntu" ] && dpkg --compare-versions "$VERSION_ID" ge "22.04" ; then
+    if [ -f /etc/needrestart/needrestart.conf ] ; then
+      sudo sed -i 's/#$nrconf{restart} = '"'"'i'"'"';/$nrconf{restart} = '"'"'a'"'"';/g' /etc/needrestart/needrestart.conf
+    fi
+    sudo apt-get -y install python3 python3-netaddr python3-pip python-is-python3
   else
     sudo apt-get -y install python python-netaddr python3 python3-pip
   fi
@@ -115,36 +122,34 @@ elif [ $ID == "debian" ] || [ $ID == "ubuntu" ] ; then
   if [ $output -ne 0 ]
   then
       fix_apt
-        if [ $ID == "ubuntu" ] && [ $VERSION_ID == "22.04" ] ; then
-          sudo apt-get -y install python3 python3-netaddr python3-pip
+        if [ $ID == "ubuntu" ] && dpkg --compare-versions "$VERSION_ID" ge "22.04" ; then
+          sudo apt-get -y install python3 python3-netaddr python3-pip python-is-python3
 
         else
           sudo apt-get -y install python python-netaddr python3 python3-pip
         fi
   fi
   fix_apt
-  sudo python3 -m pip install -U pip > /dev/null
-  sudo python3 -m pip install netaddr --upgrade > /dev/null
-  sudo python3 -m pip install requests --upgrade > /dev/null
-  sudo python3 -m pip install urllib3 --upgrade > /dev/null
-  pip install pip --upgrade > /dev/null
-  pip install pyopenssl --upgrade > /dev/null
+  pip_args=""
+  if [ $ID == "ubuntu" ] && dpkg --compare-versions "$VERSION_ID" ge "24.04" ; then
+    pip_args="--break-system-packages"
+  fi
+  sudo python3 -m pip install $pip_args netaddr requests urllib3 > /dev/null
+  python3 -m pip install $pip_args pyopenssl > /dev/null
 
-  # install oci-cli (add --oci-cli-version 3.23.3 or version that you know works if the latest does not work ) 
-  bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -s --accept-all-defaults > /dev/null
-
-  # install oci module
-  pip install oci > /dev/null
+  # install oci-cli and oci module
+  python3 -m pip install $pip_args oci-cli > /dev/null
+  python3 -m pip install $pip_args oci > /dev/null
 
   wget -O- https://apt.releases.hashicorp.com/gpg | \
   gpg --dearmor | \
-  sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
 
   echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
     https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
     sudo tee /etc/apt/sources.list.d/hashicorp.list
   
-  sudo apt update && sudo apt install terraform
+  sudo apt update && sudo apt install -y terraform
   output=$?
   if [ $output -ne 0 ]
   then
@@ -152,13 +157,13 @@ elif [ $ID == "debian" ] || [ $ID == "ubuntu" ] ; then
       echo "Terraform second try"
       wget -O- https://apt.releases.hashicorp.com/gpg | \
       gpg --dearmor | \
-      sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
 
       echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
       https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
       sudo tee /etc/apt/sources.list.d/hashicorp.list
   
-      sudo apt update && sudo apt install terraform
+      sudo apt update && sudo apt install -y terraform
   fi
   fix_apt
 fi 
@@ -185,8 +190,7 @@ sudo sed -i "s/^\(#\|;\)forks.*/forks = ${forks}/" /etc/ansible/ansible.cfg
 sudo sed -i "s/^\(#\|;\)fact_caching=.*/fact_caching=jsonfile/" /etc/ansible/ansible.cfg
 sudo sed -i "0,/^\(#\|;\)fact_caching_connection.*/s//fact_caching_connection=\/tmp\/ansible/" /etc/ansible/ansible.cfg
 sudo sed -i "s/^\(#\|;\)bin_ansible_callbacks.*/bin_ansible_callbacks=True/" /etc/ansible/ansible.cfg
-sudo sed -i "s/^\(#\|;\)stdout_callback.*/stdout_callback=yaml/" /etc/ansible/ansible.cfg
+sudo sed -i "s/^\(#\|;\)stdout_callback.*/stdout_callback=default/" /etc/ansible/ansible.cfg
 sudo sed -i "s/^\(#\|;\)retries.*/retries=5/" /etc/ansible/ansible.cfg
 sudo sed -i "s/^\(#\|;\)connect_timeout.*/connect_timeout=300/" /etc/ansible/ansible.cfg
 sudo sed -i "s/^\(#\|;\)command_timeout.*/command_timeout=120/" /etc/ansible/ansible.cfg
-

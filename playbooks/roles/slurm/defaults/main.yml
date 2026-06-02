@@ -10,3 +10,5 @@ munge_gid: 1500
 munge_uid: 1500
 rack_aware_playbook_suffix: "{% if rack_aware|bool %}-rack-aware{% endif%}"
 slurm_version: "23.02.5-1"
+slurm_deb_distribution_version: "{{ ansible_distribution_version }}"
+slurm_deb_package: "slurm-{{ slurm_version }}_{{ slurm_deb_distribution_version }}_amd64.deb"
