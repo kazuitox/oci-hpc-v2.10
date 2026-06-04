@@ -328,6 +328,7 @@ resource "null_resource" "cluster_backup" {
       instance_pool_ocpus = local.instance_pool_ocpus,
       instance_pool_memory = var.instance_pool_memory,
       instance_pool_custom_memory = var.instance_pool_custom_memory,
+      use_ood = tobool(var.use_ood),
       queue=var.queue,
       hyperthreading = var.hyperthreading,
       tags = var.tags
