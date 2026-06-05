@@ -1,4 +1,10 @@
 ---
+- name: Check munge group
+  command: getent group munge
+  register: munge_group
+  changed_when: false
+  failed_when: false
+
 - name: create munge group
   become: true
   group:
@@ -6,6 +12,14 @@
     gid: "{{ munge_gid }}"
     state: present
     system: yes
+  when: munge_group.rc != 0
+
+- name: Check munge user
+  command: getent passwd munge
+  register: munge_user
+  changed_when: false
+  failed_when: false
+
 - name: create munge user
   become: true
   user:
@@ -16,6 +30,14 @@
     shell: /sbin/nologin
     home: /var/lib/munge
     state: present
+  when: munge_user.rc != 0
+
+- name: Check slurm group
+  command: getent group slurm
+  register: slurm_group
+  changed_when: false
+  failed_when: false
+
 - name: create slurm group
   become: true
   group:
@@ -23,6 +45,14 @@
     gid: "{{ slurm_gid }}"
     state: present
     system: yes
+  when: slurm_group.rc != 0
+
+- name: Check slurm user
+  command: getent passwd slurm
+  register: slurm_user
+  changed_when: false
+  failed_when: false
+
 - name: create slurm user
   become: true
   user:
@@ -33,6 +63,7 @@
     shell: /bin/bash
     home: /var/lib/slurm
     state: present
+  when: slurm_user.rc != 0
 
 
 - name: Create Slurm RPM directory
