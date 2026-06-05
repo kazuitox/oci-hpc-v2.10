@@ -19,6 +19,16 @@
       ansible.builtin.set_fact:
         ood_server_is_ip: "{{ ood_servername is match('^([0-9]{1,3}\\.){3}[0-9]{1,3}$') }}"
 
+    - name: Install packages for repo management
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - wget
+        state: present
+        update_cache: true
+
     - name: OpenOnDemand | Generate static login system password hash
       ansible.builtin.command:
         argv:
@@ -42,51 +52,44 @@
         - ood_static_login_system_password_hash.stdout | default('') | length > 0
       no_log: true
 
-    - name: Install packages for repo management (dnf plugins)
-      ansible.builtin.dnf:
-        name:
-          - dnf-plugins-core
+    - name: Download Open OnDemand repo release deb
+      ansible.builtin.get_url:
+        url: "https://apt.osc.edu/ondemand/4.0/ondemand-release-web_4.0.0-noble_all.deb"
+        dest: /tmp/ondemand-release-web_4.0.0-noble_all.deb
+        mode: "0644"
+
+    - name: Install Open OnDemand repo release deb
+      ansible.builtin.apt:
+        deb: /tmp/ondemand-release-web_4.0.0-noble_all.deb
         state: present
-
-    - name: Enable EPEL release
-      ansible.builtin.dnf:
-        name: epel-release
-        state: present
-
-    - name: Enable required Oracle Linux repos (yum-config-manager)
-      ansible.builtin.command: "yum-config-manager --enable {{ item }}"
-      changed_when: true
-      loop:
-        - ol8_codeready_builder
-        - ol8_developer_EPEL
-
-    - name: Enable module ruby:3.3
-      ansible.builtin.command: "dnf -y module enable ruby:3.3"
-      changed_when: true
-
-    - name: Enable module nodejs:20
-      ansible.builtin.command: "dnf -y module enable nodejs:20"
-      changed_when: true
-
-    - name: Install Open OnDemand repo release rpm
-      ansible.builtin.dnf:
-        name: "https://yum.osc.edu/ondemand/4.0/ondemand-release-web-4.0-1.el8.noarch.rpm"
-        state: present
-        disable_gpg_check: true
 
     - name: Install Open OnDemand Dex login packages
-      ansible.builtin.dnf:
+      ansible.builtin.apt:
         name:
           - ondemand
           - ondemand-dex
-          - mod_auth_openidc
-          - httpd-tools
-          - mod_authnz_pam
+          - libapache2-mod-auth-openidc
+          - libapache2-mod-authnz-pam
+          - apache2-utils
         state: present
+        update_cache: true
 
-    - name: Enable and start httpd
+    - name: Enable required Apache modules
+      ansible.builtin.command: "a2enmod {{ item }}"
+      register: ood_a2enmod
+      changed_when: "'already enabled' not in ood_a2enmod.stdout"
+      loop:
+        - ssl
+        - proxy
+        - proxy_http
+        - proxy_wstunnel
+        - headers
+        - rewrite
+        - auth_openidc
+
+    - name: Enable and start apache2
       ansible.builtin.service:
-        name: httpd
+        name: apache2
         enabled: true
         state: started
 
@@ -188,11 +191,11 @@
       ansible.builtin.copy:
         src: "{{ ssl_ca_cert }}"
         remote_src: true
-        dest: "/etc/pki/ca-trust/source/anchors/cluster-ca.crt"
+        dest: "/usr/local/share/ca-certificates/cluster-ca.crt"
         mode: "0644"
 
     - name: Update CA trust
-      ansible.builtin.command: "update-ca-trust extract"
+      ansible.builtin.command: "update-ca-certificates"
       changed_when: true
 
     - name: Ensure OOD config directory exists
@@ -286,15 +289,15 @@
         dest: /etc/ood/config/ood_portal.yml
         mode: "0644"
 
-    - name: OpenOnDemand | Ensure httpd systemd drop-in directory exists
+    - name: OpenOnDemand | Ensure apache2 systemd drop-in directory exists
       ansible.builtin.file:
-        path: /etc/systemd/system/httpd.service.d
+        path: /etc/systemd/system/apache2.service.d
         state: directory
         mode: "0755"
 
-    - name: OpenOnDemand | Override httpd portal generator command
+    - name: OpenOnDemand | Override apache2 portal generator command
       ansible.builtin.copy:
-        dest: /etc/systemd/system/httpd.service.d/zz-ood-portal-insecure.conf
+        dest: /etc/systemd/system/apache2.service.d/zz-ood-portal-insecure.conf
         mode: "0644"
         content: |
           [Service]
@@ -302,7 +305,7 @@
           ExecStartPre=-/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure --force
           ExecReload=
           ExecReload=-/opt/ood/ood-portal-generator/sbin/update_ood_portal --insecure --force
-          ExecReload=/usr/sbin/httpd $OPTIONS -k graceful
+          ExecReload=/usr/sbin/apachectl graceful
       register: ood_httpd_portal_dropin
 
     - name: OpenOnDemand | Reload systemd for httpd portal override
@@ -310,8 +313,8 @@
         daemon_reload: true
       when: ood_httpd_portal_dropin.changed
 
-    - name: OpenOnDemand | Reset httpd and Dex failed state
-      ansible.builtin.command: systemctl reset-failed httpd ondemand-dex
+    - name: OpenOnDemand | Reset apache2 and Dex failed state
+      ansible.builtin.command: systemctl reset-failed apache2 ondemand-dex
       changed_when: false
       failed_when: false
 
@@ -363,14 +366,14 @@
       register: apache_configtest
       changed_when: false
 
-    - name: Restart httpd (do not block)
+    - name: Restart apache2 (do not block)
       ansible.builtin.systemd:
-        name: httpd
+        name: apache2
         state: restarted
         no_block: true
 
-    - name: Wait until httpd becomes active
-      ansible.builtin.command: systemctl is-active httpd
+    - name: Wait until apache2 becomes active
+      ansible.builtin.command: systemctl is-active apache2
       register: httpd_active
       retries: 30
       delay: 2
@@ -441,9 +444,9 @@
         enabled: true
         state: restarted
 
-    - name: OpenOnDemand | Restart httpd
+    - name: OpenOnDemand | Restart apache2
       ansible.builtin.service:
-        name: httpd
+        name: apache2
         state: restarted
 
   become: true

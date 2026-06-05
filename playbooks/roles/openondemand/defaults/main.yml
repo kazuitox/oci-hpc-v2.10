@@ -26,7 +26,7 @@ ood_ldap_bind_dn: ""
 ood_ldap_bind_pw: ""
 
 ood_enable_dex_static: true
-ood_dex_static_username: opc
+ood_dex_static_username: "{{ controller_username | default('opc') }}"
 ood_dex_static_email: "{{ ood_dex_static_username }}@example.local"
 ood_dex_static_user_id: "{{ ood_dex_static_username }}"
 ood_dex_static_hash: ""

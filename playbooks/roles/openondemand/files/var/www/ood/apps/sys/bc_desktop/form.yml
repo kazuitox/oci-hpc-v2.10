@@ -9,6 +9,7 @@ attributes:
     label: "Desktop Environment"
     widget: select
     options:
+      - "xfce"
       - "gnome"
   node_type: null
 

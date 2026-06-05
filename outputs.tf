@@ -19,5 +19,5 @@ output "ood_opc_password" {
 }
 
 output "ood_opc_username" {
-  value = "opc@example.local"
+  value = "${var.controller_username}@example.local"
 }
