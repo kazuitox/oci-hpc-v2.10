@@ -32,6 +32,11 @@
     - munge
     - slurmd
 
+- name: Reload systemd units
+  become: true
+  systemd:
+    daemon_reload: true
+
 - name: copy munge.key to tmp
   become: true
   shell:

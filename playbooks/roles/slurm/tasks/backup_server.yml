@@ -42,6 +42,11 @@
     dest: '/etc/systemd/system/slurmctld.service.d/unit.conf'
     backup: "yes"
 
+- name: Reload systemd units
+  become: true
+  systemd:
+    daemon_reload: true
+
 - name: Create munge dir
   become: true
   file:

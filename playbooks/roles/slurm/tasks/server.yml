@@ -69,6 +69,11 @@
     - slurmdbd
     - slurmctld
 
+- name: Reload systemd units
+  become: true
+  systemd:
+    daemon_reload: true
+
 - block:
     - name: Create {{ slurm_nfs_path }}/spool/slurm
       become: true

@@ -23,6 +23,8 @@ variableGroups:
   - ${targetCompartment}
   - ${ad}
   - ${ssh_key}
+  - ${cluster_os}
+  - ${use_preinstalled_compute_image}
   - ${create_iam_policy_dynamic_group}
   - ${controller_ad}
   - ${use_custom_name}
@@ -1310,6 +1312,32 @@ variables:
     title: Compute Image OS Version
     default: '8.10'
     visible: false
+  cluster_os:
+    type: enum
+    title: OS
+    description: SIMPLE モードで controller と compute node に使用する OS を選択します。Ubuntu 24.04 では compute node に必要パッケージがインストール済みの Custom Image を常に使用します。
+    required: true
+    default: Oracle Linux 8
+    enum:
+    - Oracle Linux 8
+    - Ubuntu 24.04
+    visible:
+      eq:
+      - ${ui_mode}
+      - SIMPLE
+  use_preinstalled_compute_image:
+    type: boolean
+    title: 必要パッケージがインストール済みの Compute Image を使用
+    description: チェックすると Object Storage URI から Custom Image を登録して compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため常に Custom Image を使用します。
+    default: true
+    visible:
+      and:
+      - eq:
+        - ${ui_mode}
+        - SIMPLE
+      - eq:
+        - ${cluster_os}
+        - Oracle Linux 8
   marketplace_listing:
     type: enum
     title: Image バージョン

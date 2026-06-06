@@ -64,14 +64,14 @@ resource "null_resource" "backup" {
     inline = [
       "#!/bin/bash",
       "sudo mkdir -p /opt/oci-hpc",      
-      "sudo chown ${var.controller_username}:${var.controller_username} /opt/oci-hpc/",
+      "sudo chown ${local.controller_username}:${local.controller_username} /opt/oci-hpc/",
       "mkdir -p /opt/oci-hpc/bin",
       "mkdir -p /opt/oci-hpc/playbooks"
       ]
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -81,7 +81,7 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -92,7 +92,7 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -103,7 +103,7 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -114,7 +114,7 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -124,7 +124,7 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -134,7 +134,7 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -146,18 +146,18 @@ resource "null_resource" "backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
 
   provisioner "file" {
     content     = tls_private_key.ssh.private_key_pem
-    destination = "/home/${var.controller_username}/.ssh/cluster.key"
+    destination = "/home/${local.controller_username}/.ssh/cluster.key"
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -166,15 +166,15 @@ resource "null_resource" "backup" {
   provisioner "remote-exec" {
     inline = [
       "#!/bin/bash",
-      "chmod 600 /home/${var.controller_username}/.ssh/cluster.key",
-      "cp /home/${var.controller_username}/.ssh/cluster.key /home/${var.controller_username}/.ssh/id_rsa",
+      "chmod 600 /home/${local.controller_username}/.ssh/cluster.key",
+      "cp /home/${local.controller_username}/.ssh/cluster.key /home/${local.controller_username}/.ssh/id_rsa",
       "chmod a+x /opt/oci-hpc/bin/*.sh",
       "timeout --foreground 60m /opt/oci-hpc/bin/controller.sh"
       ]
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -242,15 +242,15 @@ resource "null_resource" "cluster_backup" {
       login_mount_ip = local.login_mount_ip,
       cluster_mount_ip = local.mount_ip,
       autoscaling = var.autoscaling,
-      import_compute_image_from_object_storage = var.import_compute_image_from_object_storage,
+      import_compute_image_from_object_storage = local.effective_import_compute_image,
       cluster_name = local.cluster_name,
       shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape,
       instance_pool_ocpus = local.instance_pool_ocpus,
       queue=var.queue,
       monitoring = var.monitoring,
       hyperthreading = var.hyperthreading,
-      controller_username = var.controller_username,
-      compute_username = var.compute_username,
+      controller_username = local.controller_username,
+      compute_username = local.compute_username,
       autoscaling_monitoring = var.autoscaling_monitoring,
       autoscaling_mysql_service = var.autoscaling_mysql_service,
       monitoring_mysql_ip = var.autoscaling_monitoring && var.autoscaling_mysql_service ? oci_mysql_mysql_db_system.monitoring_mysql_db_system[0].ip_address : "localhost",
@@ -276,7 +276,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -288,7 +288,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -305,7 +305,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -317,7 +317,7 @@ resource "null_resource" "cluster_backup" {
       compute_cluster = var.compute_cluster,
       marketplace_listing = var.marketplace_listing,
       image = local.image_ocid,
-      use_marketplace_image = var.use_marketplace_image,
+      use_marketplace_image = local.effective_use_marketplace_image,
       boot_volume_size = var.boot_volume_size,
       shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape,
       region = var.region,
@@ -338,7 +338,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -421,8 +421,8 @@ resource "null_resource" "cluster_backup" {
       privilege_group_name = var.privilege_group_name,
       latency_check = var.latency_check,
       private_deployment = var.private_deployment,
-      controller_username = var.controller_username,
-      compute_username = var.compute_username,
+      controller_username = local.controller_username,
+      compute_username = local.compute_username,
       ood_opc_password = random_password.ood_opc_password.result,
       use_multiple_ads = var.use_multiple_ads, 
       use_compute_agent = var.use_compute_agent,
@@ -440,7 +440,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -452,7 +452,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }
@@ -468,7 +468,7 @@ resource "null_resource" "cluster_backup" {
     connection {
       host        = local.host_backup
       type        = "ssh"
-      user        = var.controller_username
+      user        = local.controller_username
       private_key = tls_private_key.ssh.private_key_pem
     }
   }

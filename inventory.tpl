@@ -1,7 +1,7 @@
 [controller]
 ${controller_name} ansible_host=${controller_ip} ansible_user=${controller_username} role=controller ansible_python_interpreter=auto_silent
 [slurm_backup]
-%{ if backup_name != "" }${backup_name} ansible_host=${backup_ip} ansible_user=${compute_username} role=controller%{ endif }
+%{ if backup_name != "" }${backup_name} ansible_host=${backup_ip} ansible_user=${controller_username} role=controller%{ endif }
 [login]
 %{ if login_name != "" }${login_name} ansible_host=${login_ip} ansible_user=${compute_username} role=login%{ endif }
 [compute_to_add]

@@ -61,6 +61,19 @@ variable "compute_image_operating_system_version" {
   type    = string
   default = "8.10"
 }
+variable "cluster_os" {
+  type    = string
+  default = "Oracle Linux 8"
+
+  validation {
+    condition     = contains(["Oracle Linux 8", "OracleLinux8", "Ubuntu 24.04", "Ubuntu24.04"], var.cluster_os)
+    error_message = "cluster_os must be Oracle Linux 8 or Ubuntu 24.04."
+  }
+}
+variable "use_preinstalled_compute_image" {
+  type    = bool
+  default = true
+}
 variable "use_compute_agent" { default = true }
 variable "unsupported_controller_image" { default = "" }
 variable "unsupported_login_image" { default = "" }
