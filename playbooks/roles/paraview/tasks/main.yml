@@ -5,6 +5,53 @@
       - paraview_version == '5.11.2'
     fail_msg: "Only ParaView 5.11.2 is supported."
 
+- name: Set ParaView OS support facts
+  set_fact:
+    paraview_ubuntu_2404: "{{ ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_version'] is version('24.04', '==') }}"
+
+- name: Install ParaView runtime dependencies on Ubuntu 24.04
+  vars:
+    package_name:
+      - fontconfig
+      - libdbus-1-3
+      - libegl1
+      - libfontconfig1
+      - libfreetype6
+      - libgl1
+      - libglu1-mesa
+      - libice6
+      - libopengl0
+      - libsm6
+      - libx11-6
+      - libx11-xcb1
+      - libxcb1
+      - libxcb-cursor0
+      - libxcb-glx0
+      - libxcb-icccm4
+      - libxcb-image0
+      - libxcb-keysyms1
+      - libxcb-randr0
+      - libxcb-render0
+      - libxcb-render-util0
+      - libxcb-shape0
+      - libxcb-shm0
+      - libxcb-sync1
+      - libxcb-util1
+      - libxcb-xfixes0
+      - libxcb-xinerama0
+      - libxcb-xinput0
+      - libxcb-xkb1
+      - libxext6
+      - libxkbcommon-x11-0
+      - libxrender1
+      - libxt6
+      - tar
+    package_cache: true
+    package_state: present
+  include_role:
+    name: safe_yum
+  when: paraview_ubuntu_2404 | bool
+
 - name: Create ParaView profile
   template:
     src: paraview.sh.j2

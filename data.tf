@@ -65,19 +65,6 @@ data "oci_core_images" "linux" {
   }
 }
 
-data "oci_core_images" "controller_ubuntu_2404" {
-  count                    = local.use_ubuntu_controller_platform_image ? 1 : 0
-  compartment_id           = var.targetCompartment
-  operating_system         = "Canonical Ubuntu"
-  operating_system_version = "24.04"
-
-  filter {
-    name   = "display_name"
-    values = ["^Canonical-Ubuntu-24\\.04-2026\\.04\\.30-1$"]
-    regex  = true
-  }
-}
-
 data "oci_resourcemanager_private_endpoint_reachable_ip" "private_endpoint_reachable_ip" {
     #Required
     count = var.private_deployment ? 1 : 0

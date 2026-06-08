@@ -2,7 +2,7 @@
 title: HPC クラスタ
 description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
-version: '2026052001'
+version: '2026060801'
 informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
@@ -1315,7 +1315,7 @@ variables:
   cluster_os:
     type: enum
     title: OS
-    description: SIMPLE モードで controller と compute node に使用する OS を選択します。Ubuntu 24.04 では compute node に必要パッケージがインストール済みの Custom Image を常に使用します。
+    description: SIMPLE モードで controller と compute node に使用する OS を選択します。Ubuntu 24.04 では必要パッケージがインストール済みの Custom Image を常に使用します。
     required: true
     default: Oracle Linux 8
     enum:
@@ -1328,7 +1328,7 @@ variables:
   use_preinstalled_compute_image:
     type: boolean
     title: 必要パッケージがインストール済みの Compute Image を使用
-    description: チェックすると Object Storage URI から Custom Image を登録して compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため常に Custom Image を使用します。
+    description: チェックすると Object Storage URI から Custom Image を登録して compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため controller と compute node に常に Custom Image を使用します。
     default: true
     visible:
       and:
@@ -1749,7 +1749,7 @@ variables:
     type: boolean
     title: アプリケーションを追加
     default: false
-    description: 共有領域にアプリケーションをインストールします。
+    description: Oracle Linux 8 または Ubuntu 24.04 の共有領域に OpenFOAM v2312 / ParaView 5.11.2 をインストールします。Ubuntu 24.04 で OpenFOAM を選択した場合、controller 上の /usr/mpi/gcc/openmpi-4.1.9a1 を使用してビルドします。
   application:
     type: string
     default: OpenFOAM

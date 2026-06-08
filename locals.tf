@@ -21,14 +21,14 @@ locals {
   simple_preinstalled_compute_image   = local.cluster_os_key == "Ubuntu24.04" ? true : var.use_preinstalled_compute_image
   effective_use_marketplace_image     = local.simple_mode ? !local.simple_preinstalled_compute_image : var.use_marketplace_image
   effective_import_compute_image      = local.simple_mode ? local.simple_preinstalled_compute_image : var.import_compute_image_from_object_storage
-  use_ubuntu_controller_platform_image = local.simple_mode && local.cluster_os_key == "Ubuntu24.04"
-  effective_use_marketplace_image_controller = local.use_ubuntu_controller_platform_image ? false : var.use_marketplace_image_controller
+  use_ubuntu_controller_custom_image  = local.simple_mode && local.cluster_os_key == "Ubuntu24.04"
+  effective_use_marketplace_image_controller = local.use_ubuntu_controller_custom_image ? false : var.use_marketplace_image_controller
   compute_image_source_uri            = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.source_uri : var.compute_image_source_uri
   compute_image_display_name          = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.display_name : var.compute_image_display_name
   compute_image_operating_system      = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.operating_system : var.compute_image_operating_system
   compute_image_operating_system_version = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.operating_system_version : var.compute_image_operating_system_version
   compute_username                    = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.username : var.compute_username
-  controller_username                 = local.use_ubuntu_controller_platform_image ? "ubuntu" : var.controller_username
+  controller_username                 = local.use_ubuntu_controller_custom_image ? local.simple_compute_image.username : var.controller_username
 
   region_map = {
     for region in data.oci_identity_regions.regions.regions :
@@ -76,7 +76,7 @@ locals {
   
   cluster_name = var.use_custom_name ? var.cluster_name : random_pet.name.id
 
-  controller_image = local.use_ubuntu_controller_platform_image ? data.oci_core_images.controller_ubuntu_2404[0].images[0].id : (
+  controller_image = local.use_ubuntu_controller_custom_image ? local.image_ocid : (
     local.effective_use_marketplace_image_controller ? oci_core_app_catalog_subscription.controller_mp_image_subscription[0].listing_resource_id : local.custom_controller_image_ocid
   )
 

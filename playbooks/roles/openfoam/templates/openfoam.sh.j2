@@ -1,10 +1,19 @@
 #!/bin/bash
+{% if ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_version'] is version('24.04', '==') %}
+if [ -d "{{ openfoam_ubuntu_mpi_root }}" ]; then
+    export MPI_ROOT="{{ openfoam_ubuntu_mpi_root }}"
+    export PATH="${MPI_ROOT}/bin:${PATH}"
+    export LD_LIBRARY_PATH="${MPI_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+    export MANPATH="${MPI_ROOT}/share/man${MANPATH:+:${MANPATH}}"
+fi
+{% elif ansible_facts['os_family'] == 'RedHat' %}
 for mpi_vars in /usr/mpi/gcc/*/bin/mpivars.sh; do
     if [ -f "${mpi_vars}" ]; then
         source "${mpi_vars}"
         break
     fi
 done
+{% endif %}
 
 if [ -f "{{ openfoam_project_dir }}/etc/bashrc" ]; then
     source "{{ openfoam_project_dir }}/etc/bashrc"

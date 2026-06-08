@@ -74,7 +74,7 @@ HPC_OL8
 | `login_node` | ユーザー用の追加 Login Node を作成します。 |
 | `slurm_ha` | バックアップ Slurm Controller を作成します。 |
 | `use_ood` | Open OnDemand をインストールします。 |
-| `install_application` | 共有領域に追加アプリケーションをインストールします。現時点では OpenFOAM v2312 と ParaView 5.11.2 を選択できます。 |
+| `install_application` | 共有領域に追加アプリケーションをインストールします。Oracle Linux 8 と Ubuntu 24.04 で OpenFOAM v2312 / ParaView 5.11.2 を選択できます。Ubuntu 24.04 で OpenFOAM を選ぶと、controller 上の `/usr/mpi/gcc/openmpi-4.1.9a1` を使用してビルドします。 |
 | `ood_source_cidr` | Open OnDemand の HTTPS/443 へのアクセスを許可する送信元 CIDR。 |
 | `monitoring` | Grafana / Telegraf / InfluxDB によるシステム監視を有効化します。 |
 | `autoscaling_monitoring` | Autoscaling の状態を Grafana ダッシュボードで確認できるようにします。 |

@@ -15,16 +15,57 @@
     mode: '0755'
   become: true
 
+- name: Set OpenFOAM OS support facts
+  set_fact:
+    openfoam_redhat: "{{ ansible_facts['os_family'] == 'RedHat' }}"
+    openfoam_ubuntu_2404: "{{ ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_version'] is version('24.04', '==') }}"
+    openfoam_supported_build_os: "{{ ansible_facts['os_family'] == 'RedHat' or (ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_version'] is version('24.04', '==')) }}"
+
+- name: Select OpenFOAM compile host candidates
+  set_fact:
+    openfoam_compile_candidates: "{{ groups.get('controller', []) }}"
+    openfoam_build_user: "{{ controller_username | default('opc') }}"
+
+- name: Select OpenFOAM compile delegate and orchestrator
+  set_fact:
+    openfoam_compile_delegate: "{{ openfoam_compile_candidates | first | default('') }}"
+    openfoam_compile_orchestrator: "{{ openfoam_compile_candidates | first | default('') }}"
+
 - name: Check whether this host compiles OpenFOAM
   set_fact:
-    openfoam_compile_host: "{{ inventory_hostname in groups.get('controller', []) }}"
+    openfoam_compile_host: "{{ openfoam_compile_orchestrator | length > 0 and inventory_hostname == openfoam_compile_orchestrator }}"
+
+- name: Validate OpenFOAM compile delegate
+  fail:
+    msg: "OpenFOAM compile host was not found. The controller host must be present."
+  when: openfoam_compile_delegate | length == 0
+
+- name: Show OpenFOAM compile delegate
+  debug:
+    msg: "OpenFOAM build tasks will run on {{ openfoam_compile_delegate }}."
+  when: openfoam_compile_host | bool
+
+- name: Install OpenFOAM profile on Ubuntu 24.04 compute hosts
+  template:
+    src: openfoam.sh.j2
+    dest: /etc/profile.d/openfoam.sh
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+  delegate_to: "{{ item }}"
+  loop: "{{ groups.get('compute', []) }}"
+  run_once: true
+  when:
+    - openfoam_ubuntu_2404 | bool
+    - groups.get('compute', []) | length > 0
 
 - name: Validate OpenFOAM build OS
   fail:
-    msg: "OpenFOAM v2312 source build is currently supported on RedHat family hosts."
+    msg: "OpenFOAM v2312 source build is currently supported on RedHat family and Ubuntu 24.04 hosts."
   when:
     - openfoam_compile_host | bool
-    - ansible_os_family != 'RedHat'
+    - not (openfoam_supported_build_os | bool)
 
 - name: Install OpenFOAM build dependencies
   vars:
@@ -46,16 +87,96 @@
     name: safe_yum
   when:
     - openfoam_compile_host | bool
-    - ansible_os_family == 'RedHat'
+    - openfoam_redhat | bool
 
-- name: Find OpenMPI environment script
+- name: Install OpenFOAM build dependencies on Ubuntu 24.04
+  apt:
+    name:
+      - autoconf
+      - autotools-dev
+      - bison
+      - build-essential
+      - ca-certificates
+      - cmake
+      - flex
+      - gawk
+      - gnuplot
+      - libboost-system-dev
+      - libboost-thread-dev
+      - libcgal-dev
+      - libfftw3-dev
+      - libfl-dev
+      - libgmp-dev
+      - libmpc-dev
+      - libmpfr-dev
+      - libncurses-dev
+      - libreadline-dev
+      - libscotch-dev
+      - libxt-dev
+      - rsync
+      - tar
+      - wget
+      - zlib1g-dev
+    state: present
+    update_cache: true
+  become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
+  register: openfoam_ubuntu_dependencies
+  until: openfoam_ubuntu_dependencies is not failed
+  retries: 5
+  delay: 5
+  when:
+    - openfoam_compile_host | bool
+    - openfoam_ubuntu_2404 | bool
+
+- name: Find OpenMPI environment script on RedHat
   shell: "find /usr/mpi/gcc -mindepth 3 -maxdepth 3 -path '*/bin/mpivars.sh' -print | sort | tail -n 1"
   args:
     executable: /bin/bash
-  register: openfoam_mpivars
+  register: openfoam_redhat_mpivars
   changed_when: false
-  failed_when: openfoam_mpivars.stdout == ''
-  when: openfoam_compile_host | bool
+  failed_when: openfoam_redhat_mpivars.stdout == ''
+  when:
+    - openfoam_compile_host | bool
+    - openfoam_redhat | bool
+
+- name: Set OpenFOAM MPI environment on RedHat
+  set_fact:
+    openfoam_mpi_environment_setup: |
+      source "{{ openfoam_redhat_mpivars.stdout }}"
+  when:
+    - openfoam_compile_host | bool
+    - openfoam_redhat | bool
+
+- name: Validate OpenMPI root on Ubuntu 24.04
+  stat:
+    path: "{{ openfoam_ubuntu_mpi_root }}"
+  register: openfoam_ubuntu_mpi_root_stat
+  failed_when: not (openfoam_ubuntu_mpi_root_stat.stat.isdir | default(false) | bool)
+  delegate_to: "{{ openfoam_compile_delegate }}"
+  when:
+    - openfoam_compile_host | bool
+    - openfoam_ubuntu_2404 | bool
+
+- name: Validate OpenMPI compiler on Ubuntu 24.04
+  command: "{{ openfoam_ubuntu_mpi_root }}/bin/mpicc --show"
+  register: openfoam_ubuntu_mpicc
+  changed_when: false
+  delegate_to: "{{ openfoam_compile_delegate }}"
+  when:
+    - openfoam_compile_host | bool
+    - openfoam_ubuntu_2404 | bool
+
+- name: Set OpenFOAM MPI environment on Ubuntu 24.04
+  set_fact:
+    openfoam_mpi_environment_setup: |
+      export MPI_ROOT="{{ openfoam_ubuntu_mpi_root }}"
+      export PATH="${MPI_ROOT}/bin:${PATH}"
+      export LD_LIBRARY_PATH="${MPI_ROOT}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+      export MANPATH="${MPI_ROOT}/share/man${MANPATH:+:${MANPATH}}"
+  when:
+    - openfoam_compile_host | bool
+    - openfoam_ubuntu_2404 | bool
 
 - name: Create OpenFOAM install root directory
   file:
@@ -65,6 +186,7 @@
     group: "{{ privilege_group_name | default('root') }}"
     mode: '0775'
   become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when: openfoam_compile_host | bool
 
 - name: Check OpenFOAM install marker
@@ -72,15 +194,17 @@
     path: "{{ openfoam_install_marker }}"
   register: openfoam_install_marker_stat
   become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when: openfoam_compile_host | bool
 
 - name: Create OpenFOAM local build root directory
   file:
     path: "{{ openfoam_build_root }}"
     state: directory
-    owner: "{{ controller_username | default('opc') }}"
+    owner: "{{ openfoam_build_user }}"
     mode: '0755'
   become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -91,7 +215,8 @@
     dest: "{{ openfoam_build_root }}/OpenFOAM-{{ openfoam_version }}.tgz"
     mode: '0644'
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
+  become_user: "{{ openfoam_build_user }}"
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -102,7 +227,8 @@
     dest: "{{ openfoam_build_root }}/ThirdParty-{{ openfoam_version }}.tgz"
     mode: '0644'
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
+  become_user: "{{ openfoam_build_user }}"
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -114,7 +240,8 @@
     remote_src: true
     creates: "{{ openfoam_build_project_dir }}/etc/bashrc"
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
+  become_user: "{{ openfoam_build_user }}"
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -126,7 +253,8 @@
     remote_src: true
     creates: "{{ openfoam_build_thirdparty_dir }}"
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
+  become_user: "{{ openfoam_build_user }}"
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -136,6 +264,7 @@
     path: "{{ openfoam_build_marker }}"
   register: openfoam_local_build_marker_stat
   become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -168,13 +297,13 @@
           fi
       }
 
-      for openfoam_env_file in "{{ openfoam_mpivars.stdout }}" "{{ openfoam_build_project_dir }}/etc/bashrc"; do
+      {{ openfoam_mpi_environment_setup }}
+      for openfoam_env_file in "{{ openfoam_build_project_dir }}/etc/bashrc"; do
           if [ ! -r "${openfoam_env_file}" ]; then
               echo "OpenFOAM environment file is not readable: ${openfoam_env_file}" >&2
               exit 1
           fi
       done
-      source "{{ openfoam_mpivars.stdout }}"
       source "{{ openfoam_build_project_dir }}/etc/bashrc"
       if [ -z "${WM_PROJECT_DIR:-}" ]; then
           echo "WM_PROJECT_DIR is not set after sourcing {{ openfoam_build_project_dir }}/etc/bashrc" >&2
@@ -210,7 +339,8 @@
         executable: /bin/bash
       changed_when: false
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
+  become_user: "{{ openfoam_build_user }}"
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -244,6 +374,7 @@
   args:
     executable: /bin/bash
   become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when:
     - openfoam_compile_host | bool
     - not (openfoam_install_marker_stat.stat.exists | default(false) | bool)
@@ -268,13 +399,13 @@
           fi
       }
 
-      for openfoam_env_file in "{{ openfoam_mpivars.stdout }}" "{{ openfoam_project_dir }}/etc/bashrc"; do
+      {{ openfoam_mpi_environment_setup }}
+      for openfoam_env_file in "{{ openfoam_project_dir }}/etc/bashrc"; do
           if [ ! -r "${openfoam_env_file}" ]; then
               echo "OpenFOAM environment file is not readable: ${openfoam_env_file}" >&2
               exit 1
           fi
       done
-      source "{{ openfoam_mpivars.stdout }}"
       source "{{ openfoam_project_dir }}/etc/bashrc"
       if [ -z "${WM_PROJECT_DIR:-}" ]; then
           echo "WM_PROJECT_DIR is not set after sourcing {{ openfoam_project_dir }}/etc/bashrc" >&2
@@ -288,7 +419,8 @@
     chdir: "{{ openfoam_project_dir }}"
     executable: /bin/bash
   become: true
-  become_user: "{{ controller_username | default('opc') }}"
+  become_user: "{{ openfoam_build_user }}"
+  delegate_to: "{{ openfoam_compile_delegate }}"
   changed_when: false
   when: openfoam_compile_host | bool
 
@@ -300,4 +432,5 @@
     group: "{{ privilege_group_name | default('root') }}"
     mode: '0644'
   become: true
+  delegate_to: "{{ openfoam_compile_delegate }}"
   when: openfoam_compile_host | bool

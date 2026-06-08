@@ -24,6 +24,21 @@
         seuser: system_u
         recurse: yes
 
+    - name: Set SSL certificate facts
+      set_fact:
+        ssl_cert_fqdn: "{{ ansible_facts['fqdn'] | default(inventory_hostname) }}"
+        ssl_cert_serial: "{{ ansible_facts['date_time']['epoch'] }}"
+
+    - name: Check certificate authority certificate
+      stat:
+        path: '{{ ssl_cert_path }}/cluster-ca.crt'
+      register: ssl_ca_crt
+
+    - name: Check certificate authority private key
+      stat:
+        path: '{{ ssl_cert_path }}/cluster-ca.key'
+      register: ssl_ca_key
+
     - name: Generate a certificate authority for the cluster
       command: >
         openssl req -newkey rsa:4096
@@ -32,8 +47,7 @@
           -subj "/C=US/L=Seattle/O=Oracle Cloud/CN=oraclecluster.com"
           -out '{{ ssl_cert_path }}/cluster-ca.crt'
           -keyout '{{ ssl_cert_path }}/cluster-ca.key'
-      args:
-        creates: '{{ ssl_cert_path }}/cluster-ca.crt'
+      when: not (ssl_ca_crt.stat.exists | bool and ssl_ca_key.stat.exists | bool)
 
     - name: Render subjectAltName configuration
       template:
@@ -44,26 +58,26 @@
     - name: Create a certificate request for controller
       command: >
         openssl req -new -nodes -sha512
-          -subj '/C={{ ssl_cert_country }}/ST={{ ssl_cert_state }}/L={{ ssl_cert_locality }}/O={{ ssl_cert_organization }}/CN={{ ansible_fqdn }}'
-          -out '{{ ssl_cert_path }}/{{ ansible_fqdn }}.csr'
-          -keyout '{{ ssl_cert_path }}/{{ ansible_fqdn }}.key'
+          -subj '/C={{ ssl_cert_country }}/ST={{ ssl_cert_state }}/L={{ ssl_cert_locality }}/O={{ ssl_cert_organization }}/CN={{ ssl_cert_fqdn }}'
+          -out '{{ ssl_cert_path }}/{{ ssl_cert_fqdn }}.csr'
+          -keyout '{{ ssl_cert_path }}/{{ ssl_cert_fqdn }}.key'
           -config '{{ ssl_cert_path }}/san.conf'
       args:
-        creates: '{{ ssl_cert_path }}/{{ ansible_fqdn }}.csr'
+        creates: '{{ ssl_cert_path }}/{{ ssl_cert_fqdn }}.csr'
 
     - name: Sign the certificate requests
       command: >
         openssl x509 -req
           -days {{ ssl_cert_days }}
-          -in '{{ ssl_cert_path }}/{{ ansible_fqdn }}.csr'
+          -in '{{ ssl_cert_path }}/{{ ssl_cert_fqdn }}.csr'
           -CA '{{ ssl_cert_path }}/cluster-ca.crt'
           -CAkey '{{ ssl_cert_path }}/cluster-ca.key'
-          -out '{{ ssl_cert_path }}/{{ ansible_fqdn }}.crt'
+          -out '{{ ssl_cert_path }}/{{ ssl_cert_fqdn }}.crt'
           -extensions req_ext
           -extfile '{{ ssl_cert_path }}/san.conf'
-          -set_serial {{ ansible_date_time.epoch }}
+          -set_serial {{ ssl_cert_serial }}
       args:
-        creates: '{{ ssl_cert_path }}/{{ ansible_fqdn }}.crt'
+        creates: '{{ ssl_cert_path }}/{{ ssl_cert_fqdn }}.crt'
 
     - name: Restrict access permissions to the private keys
       file:
