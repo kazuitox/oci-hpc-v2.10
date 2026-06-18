@@ -1714,7 +1714,12 @@ variables:
     title: Open OnDemand VNC に A10 GPU インスタンスを使用
     default: false
     description: チェックすると desktop partition は VM.GPU.A10.1 と VNC A10 GPU 用 Custom Image を使用し、VNC ジョブは A10 GPU を要求します。
-    visible: ${use_ood}
+    visible:
+      and:
+      - ${use_ood}
+      - eq:
+        - ${cluster_os}
+        - Oracle Linux 8
   ood_source_cidr:
     type: string
     title: Open OnDemand へのアクセスを許可する CIDR 範囲
