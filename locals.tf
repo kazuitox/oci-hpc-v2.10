@@ -15,6 +15,12 @@ locals {
       username                 = "ubuntu"
     }
   }
+  simple_gpgpu_compute_image = {
+    source_uri               = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/BlMCEroPMUpyFLRofeJNM1-4It0Cn_HxBJeLI7elkF8GGOozRzMmaUPmHv-eDIHK/n/idqcucnenh88/b/kazuito-bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-2026.05.05-0-gpu-image-v1.0"
+    display_name             = "Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-2026.05.05-0-gpu-image-v1.0"
+    operating_system         = "Ubuntu"
+    operating_system_version = "24.04"
+  }
   simple_mode                         = var.ui_mode == "SIMPLE"
   cluster_os_key                      = contains(["Ubuntu 24.04", "Ubuntu24.04"], var.cluster_os) ? "Ubuntu24.04" : "OracleLinux8"
   simple_compute_image                = local.simple_compute_images[local.cluster_os_key]
@@ -22,6 +28,7 @@ locals {
   effective_use_marketplace_image     = local.simple_mode ? !local.simple_preinstalled_compute_image : var.use_marketplace_image
   effective_import_compute_image      = local.simple_mode ? local.simple_preinstalled_compute_image : var.import_compute_image_from_object_storage
   use_ubuntu_controller_custom_image  = local.simple_mode && local.cluster_os_key == "Ubuntu24.04"
+  import_gpgpu_compute_image          = local.simple_mode && local.cluster_os_key == "Ubuntu24.04" && var.import_gpcpu_image_from_object_storage
   effective_use_marketplace_image_controller = local.use_ubuntu_controller_custom_image ? false : var.use_marketplace_image_controller
   compute_image_source_uri            = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.source_uri : var.compute_image_source_uri
   compute_image_display_name          = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.display_name : var.compute_image_display_name
@@ -51,6 +58,7 @@ locals {
   login_ad = var.login_ad != "" ? var.login_ad : var.ad
 
   shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape
+  is_gpu_compute_shape = length(regexall(".*GPU.*", local.shape)) > 0
   instance_pool_ocpus = ( local.shape == "VM.DenseIO.E4.Flex" || local.shape == "VM.DenseIO.E5.Flex" ) ? var.instance_pool_ocpus_denseIO_flex : var.instance_pool_ocpus
   controller_ocpus = ( var.controller_shape == "VM.DenseIO.E4.Flex" || var.controller_shape == "VM.DenseIO.E5.Flex" ) ? var.controller_ocpus_denseIO_flex : var.controller_ocpus
   login_ocpus = ( var.login_shape == "VM.DenseIO.E4.Flex" || var.login_shape == "VM.DenseIO.E5.Flex" ) ? var.login_ocpus_denseIO_flex : var.login_ocpus
@@ -83,9 +91,11 @@ locals {
 
   login_image = var.login_node &&  var.use_marketplace_image_login ? oci_core_app_catalog_subscription.login_mp_image_subscription[0].listing_resource_id : local.custom_login_image_ocid
 
-  cluster_network_image = local.effective_use_marketplace_image ? oci_core_app_catalog_subscription.mp_image_subscription[0].listing_resource_id : local.image_ocid
+  compute_node_image_ocid = local.import_gpgpu_compute_image && local.is_gpu_compute_shape ? oci_core_image.compute_node_gpgpu_custom_image[0].id : local.image_ocid
 
-  instance_pool_image = ! var.cluster_network && local.effective_use_marketplace_image ? oci_core_app_catalog_subscription.mp_image_subscription[0].listing_resource_id : local.image_ocid
+  cluster_network_image = local.effective_use_marketplace_image ? oci_core_app_catalog_subscription.mp_image_subscription[0].listing_resource_id : local.compute_node_image_ocid
+
+  instance_pool_image = ! var.cluster_network && local.effective_use_marketplace_image ? oci_core_app_catalog_subscription.mp_image_subscription[0].listing_resource_id : local.compute_node_image_ocid
 
   ood_vnc_image = local.ood_vnc_gpu_enabled ? oci_core_image.ood_vnc_gpu_custom_image[0].id : local.image_ocid
   ood_vnc_shape = local.ood_vnc_gpu_enabled ? "VM.GPU.A10.1" : "VM.Standard.E6.Flex"

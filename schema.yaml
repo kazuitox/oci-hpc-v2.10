@@ -25,6 +25,7 @@ variableGroups:
   - ${ssh_key}
   - ${cluster_os}
   - ${use_preinstalled_compute_image}
+  - ${import_gpcpu_image_from_object_storage}
   - ${create_iam_policy_dynamic_group}
   - ${controller_ad}
   - ${use_custom_name}
@@ -1345,6 +1346,19 @@ variables:
       - eq:
         - ${cluster_os}
         - Oracle Linux 8
+  import_gpcpu_image_from_object_storage:
+    type: boolean
+    title: GPGPU用イメージのインポート
+    description: チェックすると Ubuntu 24.04 の GPGPU 用 Custom Image を Object Storage URI から targetCompartment に登録します。計算ノードが GPU インスタンスの場合のみ、この Image を使用します。
+    default: false
+    visible:
+      and:
+      - eq:
+        - ${ui_mode}
+        - SIMPLE
+      - eq:
+        - ${cluster_os}
+        - Ubuntu 24.04
   marketplace_listing:
     type: enum
     title: Image バージョン

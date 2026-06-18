@@ -317,7 +317,7 @@ resource "null_resource" "cluster_backup" {
       use_compute_agent = var.use_compute_agent,
       compute_cluster = var.compute_cluster,
       marketplace_listing = var.marketplace_listing,
-      image = local.image_ocid,
+      image = local.compute_node_image_ocid,
       ood_vnc_image = local.ood_vnc_image,
       ood_vnc_shape = local.ood_vnc_shape,
       ood_vnc_instance_pool_ocpus = local.ood_vnc_instance_pool_ocpus,

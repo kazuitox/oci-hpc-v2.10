@@ -74,6 +74,10 @@ variable "use_preinstalled_compute_image" {
   type    = bool
   default = true
 }
+variable "import_gpcpu_image_from_object_storage" {
+  type    = bool
+  default = false
+}
 variable "use_compute_agent" { default = true }
 variable "unsupported_controller_image" { default = "" }
 variable "unsupported_login_image" { default = "" }
