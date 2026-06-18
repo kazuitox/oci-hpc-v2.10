@@ -8,8 +8,8 @@ locals {
       username                 = "opc"
     }
     "Ubuntu24.04" = {
-      source_uri               = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/mBOa1nijFhwX4CYuFC-ltZ4zX71hfzGBKx-lGbJDlIC7_b15Dmltedayipasgzi2/n/idqcucnenh88/b/kazuito-bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-2026.05.05-0-image-v1.2"
-      display_name             = "Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-2026.05.05-0-image-v1.2"
+      source_uri               = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/vPqvrTncSwkqWKvL7SuKYGucWCzzr3TiO7LnV7zQKjGYginyf80Ntb07SFYJxUrk/n/idqcucnenh88/b/kazuito-bucket/o/Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-2026.05.05-0-image-v1.3"
+      display_name             = "Canonical-Ubuntu-24.04-2026.02.28-0-6.8-DOCA-OFED-3.2.1-2026.05.05-0-image-v1.3"
       operating_system         = "Ubuntu"
       operating_system_version = "24.04"
       username                 = "ubuntu"
