@@ -39,8 +39,6 @@
   gather_facts: true
   tasks: 
     - include_role: 
-        name: nvidia_peermem
-    - include_role: 
         name: healthchecks
 
 - hosts: controller,slurm_backup,login,compute

@@ -1,4 +1,18 @@
 ---
+- name: Desktop | Ensure VirtualGL users group exists
+  ansible.builtin.group:
+    name: "{{ ood_vnc_vgl_group | default('vglusers') }}"
+    gid: "{{ ood_vnc_vgl_gid | default(9877) }}"
+    state: present
+  when: ood_vnc_use_gpu | default(false) | bool
+
+- name: Desktop | Add compute user to VirtualGL users group
+  ansible.builtin.user:
+    name: "{{ compute_username | default('opc') }}"
+    groups: "{{ ood_vnc_vgl_group | default('vglusers') }}"
+    append: true
+  when: ood_vnc_use_gpu | default(false) | bool
+
 - name: Desktop | Install "Server with GUI" package group
   vars:
     package_name:

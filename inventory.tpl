@@ -92,3 +92,4 @@ dns_entries=${dns_entries}
 healthchecks=${healthchecks}
 timezone=${timezone}
 use_ood=${use_ood}
+ood_vnc_use_gpu=${ood_vnc_use_gpu}

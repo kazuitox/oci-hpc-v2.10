@@ -35,3 +35,8 @@ ood_oidc_remote_user_claim: email
 ood_oidc_ssl_validate_server: "On"
 ood_user_map_match: "^([^@]+)(@.*)?$"
 ood_host_regex: "(compute|desktop)-[\\w-]+"
+
+ood_vnc_use_gpu: false
+ood_vnc_vgl_group: vglusers
+ood_vnc_vgl_gid: 9877
+ood_vnc_cpus_per_task: 8

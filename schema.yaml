@@ -2,7 +2,7 @@
 title: HPC クラスタ
 description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
-version: '2026060801'
+version: '2026061401'
 informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
@@ -231,6 +231,7 @@ variableGroups:
 - title: HPC Webポータル
   variables:
   - ${use_ood}
+  - ${ood_vnc_use_gpu}
   - ${ood_source_cidr}
 - title: ソフトウェア
   variables:
@@ -269,6 +270,10 @@ variableGroups:
   - ${marketplace_version_id}
   - ${compute_image_operating_system}
   - ${compute_image_operating_system_version}
+  - ${ood_vnc_gpu_image_source_uri}
+  - ${ood_vnc_gpu_image_display_name}
+  - ${ood_vnc_gpu_image_operating_system}
+  - ${ood_vnc_gpu_image_operating_system_version}
   - ${application}
   - ${application_version}
   - ${controller_boot_volume_backup_period}
@@ -1704,12 +1709,38 @@ variables:
     title: Open OnDemand をインストール
     default: true
     description: Open OnDemand は、HPC resources へのセキュアなブラウザベースアクセスを提供する Web ベース platform です。ユーザーは直接 SSH access せずに application の実行、file 管理、job 投入を行えます。
+  ood_vnc_use_gpu:
+    type: boolean
+    title: Open OnDemand VNC に A10 GPU インスタンスを使用
+    default: false
+    description: チェックすると desktop partition は VM.GPU.A10.1 と VNC A10 GPU 用 Custom Image を使用し、VNC ジョブは A10 GPU を要求します。
+    visible: ${use_ood}
   ood_source_cidr:
     type: string
     title: Open OnDemand へのアクセスを許可する CIDR 範囲
     description: 'HTTPS/443 へのアクセスを許可する送信元 CIDR です。例: 203.0.113.10/32'
     required: true
     visible: ${use_ood}
+  ood_vnc_gpu_image_source_uri:
+    type: string
+    title: Open OnDemand VNC GPU Image Source URI
+    default: https://objectstorage.ap-tokyo-1.oraclecloud.com/p/_cGy_ZWuygSW2Y9pq3yGEBmduhqWvAKgTB54_euyd7Na_VHKidiUMZRBgstp8X18/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-vnc-a10-gpu-image-v1.0
+    visible: false
+  ood_vnc_gpu_image_display_name:
+    type: string
+    title: Open OnDemand VNC GPU Image Display Name
+    default: Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-vnc-a10-gpu-image-v1.0
+    visible: false
+  ood_vnc_gpu_image_operating_system:
+    type: string
+    title: Open OnDemand VNC GPU Image OS
+    default: Oracle Linux
+    visible: false
+  ood_vnc_gpu_image_operating_system_version:
+    type: string
+    title: Open OnDemand VNC GPU Image OS Version
+    default: '8.10'
+    visible: false
   slurm_ha:
     type: boolean
     title: バックアップ Slurm Controller を作成

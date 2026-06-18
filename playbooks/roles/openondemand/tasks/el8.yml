@@ -19,6 +19,20 @@
       ansible.builtin.set_fact:
         ood_server_is_ip: "{{ ood_servername is match('^([0-9]{1,3}\\.){3}[0-9]{1,3}$') }}"
 
+    - name: OpenOnDemand | Ensure VirtualGL users group exists
+      ansible.builtin.group:
+        name: "{{ ood_vnc_vgl_group | default('vglusers') }}"
+        gid: "{{ ood_vnc_vgl_gid | default(9877) }}"
+        state: present
+      when: ood_vnc_use_gpu | default(false) | bool
+
+    - name: OpenOnDemand | Add controller user to VirtualGL users group
+      ansible.builtin.user:
+        name: "{{ controller_username | default('opc') }}"
+        groups: "{{ ood_vnc_vgl_group | default('vglusers') }}"
+        append: true
+      when: ood_vnc_use_gpu | default(false) | bool
+
     - name: OpenOnDemand | Generate static login system password hash
       ansible.builtin.command:
         argv:
@@ -397,9 +411,22 @@
           ---
           batch_connect:
             template: vnc
+          {% if ood_vnc_use_gpu | default(false) | bool %}
+            script_wrapper: |
+              export PATH=/opt/ood-vgl/bin:/usr/local/bin:/opt/VirtualGL/bin:$PATH
+              export VGL_DISPLAY=egl0
+              %s
+          {% endif %}
           cluster: "myslurm"
           script:
+          {% if ood_vnc_use_gpu | default(false) | bool %}
+            native:
+              - "--partition=desktop"
+              - "--gres=gpu:A10:1"
+              - "--cpus-per-task={{ ood_vnc_cpus_per_task | default(8) }}"
+          {% else %}
             queue_name: <%= bc_queue %>
+          {% endif %}
 
     - name: OpenOnDemand | Update bc_desktop form.yml
       ansible.builtin.copy:

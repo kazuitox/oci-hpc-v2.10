@@ -93,6 +93,26 @@ variable "rdma_subnet" { default = "10.224.0.0/12" }
 variable "private_subnet" { default = "172.16.4.0/22" }
 variable "ssh_cidr" { default = "0.0.0.0/0" }
 variable "ood_source_cidr" { default = "" }
+variable "ood_vnc_use_gpu" {
+  type    = bool
+  default = false
+}
+variable "ood_vnc_gpu_image_source_uri" {
+  type    = string
+  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/_cGy_ZWuygSW2Y9pq3yGEBmduhqWvAKgTB54_euyd7Na_VHKidiUMZRBgstp8X18/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-vnc-a10-gpu-image-v1.0"
+}
+variable "ood_vnc_gpu_image_display_name" {
+  type    = string
+  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-vnc-a10-gpu-image-v1.0"
+}
+variable "ood_vnc_gpu_image_operating_system" {
+  type    = string
+  default = "Oracle Linux"
+}
+variable "ood_vnc_gpu_image_operating_system_version" {
+  type    = string
+  default = "8.10"
+}
 variable "slurm" { default = true }
 variable "slurm_ha" { default = false }
 variable "login_node" { default = false }

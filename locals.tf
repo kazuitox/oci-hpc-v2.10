@@ -62,6 +62,7 @@ locals {
 // vcn id derived either from created vcn or existing if specified
   vcn_id = var.use_existing_vcn ? var.vcn_id : element(concat(oci_core_vcn.vcn.*.id, [""]), 0)
   ood_source_cidr = trimspace(var.ood_source_cidr) != "" ? trimspace(var.ood_source_cidr) : var.ssh_cidr
+  ood_vnc_gpu_enabled = var.ood_vnc_use_gpu && tobool(var.use_ood)
 
 // subnet id derived either from created subnet or existing if specified
 //  subnet_id = var.use_existing_vcn ? var.private_subnet_id : element(concat(oci_core_subnet.private-subnet.*.id, [""]), 0)
@@ -85,6 +86,10 @@ locals {
   cluster_network_image = local.effective_use_marketplace_image ? oci_core_app_catalog_subscription.mp_image_subscription[0].listing_resource_id : local.image_ocid
 
   instance_pool_image = ! var.cluster_network && local.effective_use_marketplace_image ? oci_core_app_catalog_subscription.mp_image_subscription[0].listing_resource_id : local.image_ocid
+
+  ood_vnc_image = local.ood_vnc_gpu_enabled ? oci_core_image.ood_vnc_gpu_custom_image[0].id : local.image_ocid
+  ood_vnc_shape = local.ood_vnc_gpu_enabled ? "VM.GPU.A10.1" : "VM.Standard.E6.Flex"
+  ood_vnc_instance_pool_ocpus = local.ood_vnc_gpu_enabled ? 8 : 2
 
 //  image = (var.cluster_network && var.use_marketplace_image == true) || (var.cluster_network == false && var.use_marketplace_image == false) ? var.image : data.oci_core_images.linux.images.0.id
 

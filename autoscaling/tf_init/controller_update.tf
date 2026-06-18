@@ -65,6 +65,7 @@ resource "local_file" "inventory" {
     timezone = var.timezone,
     tags = var.tags,
     use_ood = var.use_ood,
+    ood_vnc_use_gpu = var.ood_vnc_use_gpu,
     controller_block = var.controller_block,
     login_block = var.login_block,
     scratch_nfs_type = local.scratch_nfs_type,
