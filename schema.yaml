@@ -31,6 +31,13 @@ variableGroups:
   - ${cluster_name}
   - ${fss_compartment}
   - ${fss_ad}
+- title: controllerノードで利用するインスタンス
+  variables:
+  - ${controller_shape}
+  - ${controller_ocpus}
+  - ${controller_ocpus_denseIO_flex}
+  - ${controller_custom_memory}
+  - ${controller_memory}
 - title: 計算ノードで利用するインスタンス
   variables:
   - ${cluster_network}
@@ -57,11 +64,6 @@ variableGroups:
   - ${paraview_version}
 - title: Headnode オプション
   variables:
-  - ${controller_shape}
-  - ${controller_ocpus}
-  - ${controller_ocpus_denseIO_flex}
-  - ${controller_custom_memory}
-  - ${controller_memory}
   - ${controller_boot_volume_size}
   - ${controller_boot_volume_backup}
   - ${controller_object_storage_par}
