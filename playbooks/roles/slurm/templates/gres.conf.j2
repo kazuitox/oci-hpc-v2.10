@@ -42,6 +42,8 @@ NodeName={{partition.name}}-{{instance.instance_keyword}}-node-[1-{{size}}] Name
 NodeName={{partition.name}}-{{instance.instance_keyword}}-node-[1-{{size}}] Name=gpu File=/dev/nvidia[0-1] Type=A10 Cores=[0-29]
 {% elif instance.shape == "VM.GPU.A10.1" %}
 NodeName={{partition.name}}-{{instance.instance_keyword}}-node-[1-{{size}}] Name=gpu File=/dev/nvidia0 Type=A10 Cores=[0-14]
+{% elif instance.shape == "VM.GPU.A100.B40G.1" %}
+NodeName={{partition.name}}-{{instance.instance_keyword}}-node-[1-{{size}}] Name=gpu File=/dev/nvidia0 Type=A100 Cores=[0-14]
 {% endif %}
 {% endfor %}
 {% endfor %}
