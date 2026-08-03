@@ -1,0 +1,80 @@
+---
+- name: OpenComposer | Configure the Slurm job form
+  ansible.builtin.include_tasks: opencomposer_form.yml
+
+- name: OpenComposer | Install Git
+  ansible.builtin.dnf:
+    name: git
+    state: present
+
+- name: "OpenComposer | Check out {{ ood_opencomposer_version }}"
+  ansible.builtin.git:
+    repo: "{{ ood_opencomposer_repository }}"
+    dest: "{{ ood_opencomposer_install_dir }}"
+    version: "{{ ood_opencomposer_revision }}"
+    update: true
+    force: false
+  register: ood_opencomposer_checkout
+
+- name: OpenComposer | Set system app directory permissions
+  ansible.builtin.file:
+    path: "{{ ood_opencomposer_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "u=rwX,g=rX,o=rX"
+    recurse: true
+  register: ood_opencomposer_permissions
+
+- name: OpenComposer | Create the Passenger restart directory
+  ansible.builtin.file:
+    path: "{{ ood_opencomposer_install_dir }}/tmp"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: OpenComposer | Configure the Slurm backend
+  ansible.builtin.template:
+    src: opencomposer_conf.yml.erb.j2
+    dest: "{{ ood_opencomposer_install_dir }}/conf.yml.erb"
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_opencomposer_config
+
+- name: OpenComposer | Install the Slurm application manifest
+  ansible.builtin.template:
+    src: opencomposer_slurm_manifest.yml.j2
+    dest: "{{ ood_opencomposer_apps_dir }}/slurm/manifest.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_opencomposer_manifest
+
+- name: OpenComposer | Verify the app in the Open OnDemand Ruby environment
+  ansible.builtin.command:
+    argv:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        source /opt/ood/nginx_stage/etc/profile
+        exec /opt/ood/nginx_stage/bin/ruby -e 'require "./run"'
+  args:
+    chdir: "{{ ood_opencomposer_install_dir }}"
+  changed_when: false
+
+- name: OpenComposer | Request a Passenger restart after managed changes
+  ansible.builtin.file:
+    path: "{{ ood_opencomposer_install_dir }}/tmp/restart.txt"
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+  when: >-
+    ood_opencomposer_checkout.changed
+    or ood_opencomposer_permissions.changed
+    or ood_opencomposer_config.changed
+    or ood_opencomposer_manifest.changed
+    or ood_opencomposer_form.changed

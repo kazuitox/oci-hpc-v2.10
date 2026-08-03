@@ -340,6 +340,9 @@
           - "favicon.ico"
         ood_ux_config_url: "https://raw.githubusercontent.com/koiker/oci-hpc/master/artifacts/ondemand/oracle_ux.yml"
 
+    - name: OpenOnDemand | Install OpenComposer
+      ansible.builtin.include_tasks: opencomposer.yml
+
     - name: OpenOnDemand | Apply dashboard customizations
       ansible.builtin.include_tasks: ood_dashboard_customizations.yml
 

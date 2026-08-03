@@ -73,7 +73,7 @@ HPC_OL8
 | `private_deployment` | コントローラに Public IP を付与せず、Resource Manager Private Endpoint 経由で構成します。 |
 | `login_node` | ユーザー用の追加 Login Node を作成します。 |
 | `slurm_ha` | バックアップ Slurm Controller を作成します。 |
-| `use_ood` | Open OnDemand をインストールします。 |
+| `use_ood` | Open OnDemand と OpenComposer をインストールします。 |
 | `install_application` | 共有領域に追加アプリケーションをインストールします。現時点では OpenFOAM v2312 と ParaView 5.11.2 を選択できます。 |
 | `ood_source_cidr` | Open OnDemand の HTTPS/443 へのアクセスを許可する送信元 CIDR。 |
 | `monitoring` | Grafana / Telegraf / InfluxDB によるシステム監視を有効化します。 |
@@ -274,7 +274,13 @@ cluster user add <name> --nossh --gid 9876
 
 ## Open OnDemand
 
-`use_ood` を有効にすると、Open OnDemand をインストールします。ユーザーはブラウザからファイル操作、ジョブ投入、アプリケーション実行を行えます。スタックは Open OnDemand 用の初期パスワードも生成し、構成に反映します。
+`use_ood` を有効にすると、Open OnDemand と [OpenComposer](https://github.com/RIKEN-RCCS/OpenComposer) をインストールします。ユーザーはブラウザからファイル操作、ジョブ投入、アプリケーション実行を行えます。スタックは Open OnDemand 用の初期パスワードも生成し、構成に反映します。
+
+OpenComposer は `v2.0.2`（commit `7af3d94b36043d8019b1639cd8e463957eb7a37e`）に固定し、スタックの Slurm を直接利用するよう構成します。OpenComposer には、`queues.conf` のパーティションとインスタンスタイプ（Slurm Constraint）を選択できる汎用 Slurm ジョブフォームも追加します。Constraint の候補には各パーティションの `instance_types[].name`、つまり生成される `slurm.conf` の `NodeName` における `Features` の最後の値を使用します。パーティションを変更すると、そのパーティションで利用できる Constraint だけが選択肢として有効になります。`BM or VM` で `VM` を選ぶと、`#SBATCH --ntasks-per-core=1` と `#SBATCH --exclusive` をジョブスクリプトへ追加し、`BM` では追加しません。また、Shape（`BM.Optimized3.36/BM.HPC.E5.144` または `VM Shape`）と MPI（`OpenMPI v4.x` または `Intel MPI(OneAPI)`）を選ぶと、その組み合わせに対応する mpirun オプションを `export MPI_OPTIONS="..."` としてジョブスクリプトへ挿入します。フォームで生成したジョブスクリプトは投入前に編集できます。Ruby の依存 gem には Open OnDemand 4.0 が同梱する gem セットを利用します。
+
+デプロイ後に `/opt/oci-hpc/conf/queues.conf` のパーティションや `instance_types[].name` を変更した場合は、プライマリコントローラで `/opt/oci-hpc/bin/slurm_config.sh` を実行してください。Slurm 設定と OpenComposer のジョブフォームが同時に再生成されます。OpenComposer や Apache の再起動は不要で、ブラウザでジョブ作成画面を再読み込みすると変更が反映されます。OpenComposer v2.0.2 の動的フォームで安全に扱うため、パーティション名と `instance_types[].name` には英数字、ハイフン、アンダースコアだけを使用してください。
+
+OpenComposer v2.0.2 の UI は、ブラウザから jsDelivr、cdnjs、Google Fonts の公開 CDN を参照します。閉域端末や厳格な Content Security Policy で利用する場合は、CDN へのアクセス許可またはアセットのローカル配信が別途必要です。
 
 Open OnDemand の HTTPS/443 は `ood_source_cidr` で指定した送信元 CIDR からのみ許可されます。管理端末の固定グローバル IP など、必要な範囲に絞って指定してください。
 

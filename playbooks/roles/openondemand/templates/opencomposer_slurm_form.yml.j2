@@ -1,0 +1,105 @@
+---
+{# Dynamic directives use generated widget keys because v2.0.2 treats option labels as regular expressions. #}
+form:
+  partition:
+    widget: select
+    label: パーティション
+    value: {{ queue | default('compute') | to_json }}
+    options:
+{% for partition in queues %}
+      - [{{ partition.name | to_json }}, {{ partition.name | to_json }}, {{ ('enable-constraint_p' ~ loop.index) | to_json }}]
+{% endfor %}
+    required: true
+
+{% for partition in queues %}
+{% set default_instances = partition.instance_types | selectattr('default', 'defined') | selectattr('default', 'equalto', true) | list %}
+  constraint_p{{ loop.index }}:
+    widget: select
+    label: インスタンスタイプ（Constraint）
+    value: {{ (((default_instances | first) | default(partition.instance_types[0], true)).name) | to_json }}
+    options:
+{% for instance in partition.instance_types | unique(case_sensitive=true, attribute='name') %}
+      - [{{ instance.name | to_json }}, {{ instance.name | to_json }}]
+{% endfor %}
+    required: true
+
+{% endfor %}
+  bm_or_vm:
+    widget: select
+    label: BM or VM
+    value: {{ 'BM' | to_json }}
+    options:
+      - [{{ 'BM' | to_json }}, {{ ['', ''] | to_json }}]
+      - [{{ 'VM' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}]
+    required: true
+
+  mpi_shape:
+    widget: select
+    label: Shape
+    value: {{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}
+    options:
+      - [{{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}, {{ 'bm_hpc' | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
+      - [{{ 'VM Shape' | to_json }}, {{ 'vm' | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+    required: true
+
+  mpi_bm_hpc:
+    widget: select
+    label: MPI
+    value: {{ 'OpenMPI v4.x' | to_json }}
+    options:
+      - [{{ 'OpenMPI v4.x' | to_json }}, {{ '--report-bindings -mca pml ucx -mca coll_hcoll_enable 0 -x UCX_TLS=rc,self,sm -x UCX_NET_DEVICES=mlx5_2:1 -x UCX_IB_TRAFFIC_CLASS=105 -x UCX_IB_GID_INDEX=3 -x HCOLL_ENABLE_MCAST_ALL=0' | to_json }}]
+      - [{{ 'Intel MPI(OneAPI)' | to_json }}, {{ '-genv UCX_TLS=rc,self,sm -genv UCX_NET_DEVICES=mlx5_2:1 -genv I_MPI_FABRICS=shm:ofi -genv I_MPI_DEBUG=5' | to_json }}]
+    required: true
+
+  mpi_vm:
+    widget: select
+    label: MPI
+    value: {{ 'OpenMPI v4.x' | to_json }}
+    options:
+      - [{{ 'OpenMPI v4.x' | to_json }}, {{ '--report-bindings --mca btl self,tcp --mca coll_hcoll_enable 0 --bind-to core' | to_json }}]
+      - [{{ 'Intel MPI(OneAPI)' | to_json }}, {{ '-genv I_MPI_FABRICS=shm:ofi -genv I_MPI_OFI_PROVIDER=tcp -genv I_MPI_DEBUG=5' | to_json }}]
+    required: true
+
+  nodes:
+    widget: number
+    label: ノード数
+    value: 1
+    min: 1
+    required: true
+
+  tasks_per_node:
+    widget: number
+    label: ノードあたりのタスク数
+    value: 1
+    min: 1
+    required: true
+
+  walltime:
+    widget: number
+    label: [実行時間（時）, 実行時間（分）]
+    size: 2
+    value: [1, 0]
+    min: [0, 0]
+    max: ["", 59]
+    required: [true, true]
+
+  command:
+    widget: text
+    label: 実行コマンド
+    value: /usr/bin/srun /usr/bin/hostname
+    required: true
+
+script: |
+  #!/bin/bash
+  #SBATCH --partition=#{partition}
+{% for partition in queues %}  #SBATCH --constraint=#{constraint_p{{ loop.index }}}
+{% endfor %}  #SBATCH #{bm_or_vm_1}
+  #SBATCH #{bm_or_vm_2}
+  #SBATCH --nodes=#{nodes}
+  #SBATCH --ntasks-per-node=#{tasks_per_node}
+  #SBATCH --time=#{walltime_1}:#{walltime_2}:00
+
+  export MPI_OPTIONS="#{mpi_bm_hpc}"
+  export MPI_OPTIONS="#{mpi_vm}"
+
+  #{command}

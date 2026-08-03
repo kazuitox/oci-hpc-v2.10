@@ -1675,7 +1675,7 @@ variables:
     type: boolean
     title: Open OnDemand をインストール
     default: true
-    description: Open OnDemand は、HPC resources へのセキュアなブラウザベースアクセスを提供する Web ベース platform です。ユーザーは直接 SSH access せずに application の実行、file 管理、job 投入を行えます。
+    description: Open OnDemand は、HPC resources へのセキュアなブラウザベースアクセスを提供する Web ベース platform です。ユーザーは直接 SSH access せずに application の実行、file 管理、job 投入を行えます。パーティションとインスタンスタイプ（Constraint）を選択できる Slurm ジョブ作成用の OpenComposer v2.0.2 もインストールします。
   ood_source_cidr:
     type: string
     title: Open OnDemand へのアクセスを許可する CIDR 範囲

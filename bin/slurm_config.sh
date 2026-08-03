@@ -20,7 +20,7 @@ then
       sudo rm /etc/slurm/topology.conf 
       sudo /usr/sbin/slurmctld -c
    fi
-   ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook $playbooks_path/slurm_config.yml
+   ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook "$playbooks_path/slurm_config.yml" || exit $?
    if [[ ${@: -1} == "--INITIAL" || ${@: -1} == "--initial" || ${@: -1} == "-INITIAL" || ${@: -1} == "-initial" ]]
    then
       for inventory in /opt/oci-hpc/autoscaling/clusters/*/inventory ; 
@@ -34,5 +34,6 @@ then
       done
    fi
  else
-   echo "There are some duplicates instance_keyword lines, please make them unique"   
+   echo "There are some duplicates instance_keyword lines, please make them unique"
+   exit 1
 fi

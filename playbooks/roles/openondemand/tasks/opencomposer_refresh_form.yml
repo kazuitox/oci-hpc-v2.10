@@ -1,0 +1,17 @@
+---
+- name: OpenComposer | Check whether OpenComposer is installed
+  ansible.builtin.stat:
+    path: "{{ ood_opencomposer_install_dir }}/run.rb"
+  register: ood_opencomposer_entrypoint
+
+- name: OpenComposer | Require an installed OpenComposer app
+  ansible.builtin.assert:
+    that:
+      - ood_opencomposer_entrypoint.stat.exists | default(false)
+      - ood_opencomposer_entrypoint.stat.isreg | default(false)
+    fail_msg: >-
+      OpenComposer is enabled but {{ ood_opencomposer_install_dir }}/run.rb is
+      missing. Deploy the openondemand role before refreshing Slurm settings.
+
+- name: OpenComposer | Refresh the Slurm job form
+  ansible.builtin.include_tasks: opencomposer_form.yml

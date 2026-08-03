@@ -35,3 +35,13 @@ ood_oidc_remote_user_claim: email
 ood_oidc_ssl_validate_server: "On"
 ood_user_map_match: "^([^@]+)(@.*)?$"
 ood_host_regex: "(compute|desktop)-[\\w-]+"
+
+# OpenComposer is installed as an Open OnDemand system app. Keep the release
+# pinned so re-running the playbook cannot silently upgrade the application.
+ood_opencomposer_repository: https://github.com/RIKEN-RCCS/OpenComposer.git
+ood_opencomposer_version: v2.0.2
+ood_opencomposer_revision: 7af3d94b36043d8019b1639cd8e463957eb7a37e
+ood_opencomposer_install_dir: /var/www/ood/apps/sys/OpenComposer
+ood_opencomposer_apps_dir: /etc/ood/config/opencomposer/apps
+ood_opencomposer_scheduler_bin: /usr/bin
+ood_opencomposer_copy_environment: false

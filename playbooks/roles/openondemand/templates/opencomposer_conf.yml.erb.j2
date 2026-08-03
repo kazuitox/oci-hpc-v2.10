@@ -1,0 +1,6 @@
+---
+apps_dir: {{ ood_opencomposer_apps_dir | to_json }}
+scheduler: slurm
+login_node: {{ ood_servername | to_json }}
+bin: {{ ood_opencomposer_scheduler_bin | to_json }}
+copy_environment: {{ ood_opencomposer_copy_environment | bool | lower }}
