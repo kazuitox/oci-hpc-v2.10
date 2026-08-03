@@ -26,11 +26,12 @@ form:
 {% endfor %}
   mpi_shape:
     widget: select
-    label: Shape
-    value: {{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}
+    label: Shape Type
+    value: {{ 'BM HPC Shape' | to_json }}
     options:
-      - [{{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
+      - [{{ 'BM HPC Shape' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
       - [{{ 'VM Shape' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'BM Standard Shape' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
     required: true
 
   mpi_bm_hpc:
