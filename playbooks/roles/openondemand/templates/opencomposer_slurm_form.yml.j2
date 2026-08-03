@@ -24,22 +24,13 @@ form:
     required: true
 
 {% endfor %}
-  bm_or_vm:
-    widget: select
-    label: BM or VM
-    value: {{ 'BM' | to_json }}
-    options:
-      - [{{ 'BM' | to_json }}, {{ ['', ''] | to_json }}]
-      - [{{ 'VM' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}]
-    required: true
-
   mpi_shape:
     widget: select
     label: Shape
     value: {{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}
     options:
-      - [{{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}, {{ 'bm_hpc' | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
-      - [{{ 'VM Shape' | to_json }}, {{ 'vm' | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'BM.Optimized3.36/BM.HPC.E5.144' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
+      - [{{ 'VM Shape' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
     required: true
 
   mpi_bm_hpc:
@@ -93,8 +84,8 @@ script: |
   #!/bin/bash
   #SBATCH --partition=#{partition}
 {% for partition in queues %}  #SBATCH --constraint=#{constraint_p{{ loop.index }}}
-{% endfor %}  #SBATCH #{bm_or_vm_1}
-  #SBATCH #{bm_or_vm_2}
+{% endfor %}  #SBATCH #{mpi_shape_1}
+  #SBATCH #{mpi_shape_2}
   #SBATCH --nodes=#{nodes}
   #SBATCH --ntasks-per-node=#{tasks_per_node}
   #SBATCH --time=#{walltime_1}:#{walltime_2}:00
