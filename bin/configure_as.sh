@@ -20,7 +20,10 @@ then
 username=$USER
 fi
 
-/opt/oci-hpc/bin/wait_for_hosts.sh $inventory_path/hosts_$1 $username
+if ! /opt/oci-hpc/bin/wait_for_hosts.sh "$inventory_path/hosts_$1" "$username"; then
+  echo "SSH did not become ready on all autoscaling nodes" >&2
+  exit 1
+fi
 #
 # Ansible will take care of key exchange and learning the host fingerprints, but for the first time we need
 # to disable host key checking. 
