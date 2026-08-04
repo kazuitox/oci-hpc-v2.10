@@ -340,6 +340,8 @@
       when: slurm|default(false)|bool
 
 - hosts: controller
+  vars_files:
+    - "/opt/oci-hpc/conf/queues.conf"
   tasks:
     - include_role:
         name: openondemand

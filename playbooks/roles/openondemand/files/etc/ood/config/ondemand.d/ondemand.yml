@@ -8,6 +8,7 @@ pinned_apps:
   - 'sys/shell'
   - 'sys/activejobs'
   - 'sys/myjobs'
+  - 'sys/OpenComposer'
   - 'sys/system-status'
 
 pinned_apps_menu_length: 15

@@ -11,3 +11,17 @@
     - include_role:
         name: slurm
       when: slurm|default(true)|bool
+
+- hosts: controller
+  become: true
+  gather_facts: false
+  vars_files:
+    - "/opt/oci-hpc/conf/queues.conf"
+  tasks:
+    - name: OpenComposer | Refresh constraint choices from queues.conf
+      ansible.builtin.include_role:
+        name: openondemand
+        tasks_from: opencomposer_refresh_form
+      when:
+        - slurm | default(true) | bool
+        - use_ood | default(false) | bool
