@@ -15,24 +15,26 @@ form:
 {% set default_instances = partition.instance_types | selectattr('default', 'defined') | selectattr('default', 'equalto', true) | list %}
   constraint_p{{ loop.index }}:
     widget: select
-    label: インスタンスタイプ（Constraint）
+    label: ノードグループ（Constraint）
     value: {{ (((default_instances | first) | default(partition.instance_types[0], true)).name) | to_json }}
     options:
 {% for instance in partition.instance_types | unique(case_sensitive=true, attribute='name') %}
       - [{{ instance.name | to_json }}, {{ instance.name | to_json }}]
 {% endfor %}
     required: true
+    help: ジョブを実行するSlurmノードグループを選択します。
 
 {% endfor %}
   mpi_shape:
     widget: select
-    label: Shape Type
-    value: {{ 'BM HPC Shape' | to_json }}
+    label: 実行プロファイル（MPI/Slurm）
+    value: {{ 'BM HPC（RDMA）' | to_json }}
     options:
-      - [{{ 'BM HPC Shape' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
-      - [{{ 'VM Shape' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
-      - [{{ 'BM Standard Shape' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'BM HPC（RDMA）' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
+      - [{{ 'VM' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'BM Standard' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
     required: true
+    help: ハードウェアに対応するMPIおよびSlurm設定を選択します。
 
   mpi_bm_hpc:
     widget: select
