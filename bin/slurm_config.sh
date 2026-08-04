@@ -18,7 +18,19 @@ then
    if [[ ${@: -1} == "--INITIAL" || ${@: -1} == "--initial" || ${@: -1} == "-INITIAL" || ${@: -1} == "-initial" ]]
    then
       sudo rm /etc/slurm/topology.conf 
-      sudo /usr/sbin/slurmctld -c
+      case "$ID" in
+         ubuntu)
+            slurmctld_path=/usr/local/sbin/slurmctld
+            ;;
+         ol|centos)
+            slurmctld_path=/usr/sbin/slurmctld
+            ;;
+         *)
+            echo "Unsupported OS: $ID" >&2
+            exit 1
+            ;;
+      esac
+      sudo "$slurmctld_path" -c
    fi
    ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook $playbooks_path/slurm_config.yml
    if [[ ${@: -1} == "--INITIAL" || ${@: -1} == "--initial" || ${@: -1} == "-INITIAL" || ${@: -1} == "-initial" ]]
