@@ -32,7 +32,7 @@ form:
     options:
       - [{{ 'BM HPC（RDMA）' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
       - [{{ 'VM' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
-      - [{{ 'BM Standard' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'BM Standard' | to_json }}, {{ ['', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
     required: true
     help: ハードウェアに対応するMPIおよびSlurm設定を選択します。
 
