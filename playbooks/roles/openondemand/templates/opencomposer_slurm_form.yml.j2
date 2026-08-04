@@ -68,6 +68,16 @@ form:
     min: 1
     required: true
 
+  walltime_enabled:
+    widget: select
+    label: 実行時間の指定
+    value: {{ '有効' | to_json }}
+    options:
+      - [{{ '有効' | to_json }}, {{ '#SBATCH --time=' | to_json }}, {{ 'enable-walltime' | to_json }}]
+      - [{{ '無効' | to_json }}, {{ '' | to_json }}]
+    required: true
+    help: 無効にするとSBATCHのtime指定をジョブスクリプトへ追加しません。
+
   walltime:
     widget: number
     label: [実行時間（時）, 実行時間（分）]
@@ -91,7 +101,7 @@ script: |
   #SBATCH #{mpi_shape_2}
   #SBATCH --nodes=#{nodes}
   #SBATCH --ntasks-per-node=#{tasks_per_node}
-  #SBATCH --time=#{walltime_1}:#{walltime_2}:00
+  #{walltime_enabled}#{walltime_1}:#{walltime_2}:00
 
   export MPI_OPTIONS="#{mpi_bm_hpc}"
   export MPI_OPTIONS="#{mpi_vm}"
