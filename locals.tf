@@ -47,7 +47,12 @@ locals {
   cluster_instances_ids = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.id : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.id : data.oci_core_instance.instance_pool_instances.*.id
   cluster_instances_names = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.display_name : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.display_name : data.oci_core_instance.instance_pool_instances.*.display_name
 
-  image_ocid = local.effective_import_compute_image && !local.effective_use_marketplace_image ? oci_core_image.compute_node_custom_image[0].id : (
+  // Source the image OCID from all compatibility entries so deployments wait for their registration.
+  imported_compute_image_ocid = one(toset(concat(
+    oci_core_image.compute_node_custom_image[*].id,
+    [for compatibility in oci_core_shape_management.compute_node_custom_image_compatible_shapes : compatibility.image_id],
+  )))
+  image_ocid = local.effective_import_compute_image && !local.effective_use_marketplace_image ? local.imported_compute_image_ocid : (
     var.unsupported ? var.image_ocid : var.image
   )
   custom_controller_image_ocid = var.unsupported_controller ? var.unsupported_controller_image : var.custom_controller_image
