@@ -11,7 +11,7 @@ locals {
 }
 
 resource "oci_core_image" "compute_node_custom_image" {
-  count = local.effective_import_compute_image && !local.effective_use_marketplace_image ? 1 : 0
+  count = local.use_imported_compute_image ? 1 : 0
 
   compartment_id = var.targetCompartment
   display_name   = local.compute_image_display_name
@@ -25,7 +25,7 @@ resource "oci_core_image" "compute_node_custom_image" {
 }
 
 resource "oci_core_shape_management" "compute_node_custom_image_compatible_shapes" {
-  for_each = local.effective_import_compute_image && !local.effective_use_marketplace_image ? local.available_compute_node_custom_image_compatible_shapes : toset([])
+  for_each = local.use_imported_compute_image ? local.available_compute_node_custom_image_compatible_shapes : toset([])
 
   compartment_id = var.targetCompartment
   image_id       = oci_core_image.compute_node_custom_image[0].id

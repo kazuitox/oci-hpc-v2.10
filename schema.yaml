@@ -1372,7 +1372,7 @@ variables:
   use_preinstalled_compute_image:
     type: boolean
     title: 必要パッケージがインストール済みの Compute Image を使用
-    description: チェックすると Object Storage URI から Custom Image を登録して compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため controller と compute node に常に Custom Image を使用します。
+    description: チェックすると Object Storage URI から Custom Image を登録して controller と compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため controller と compute node に常に Custom Image を使用します。
     default: true
     visible:
       and:
