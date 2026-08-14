@@ -62,11 +62,10 @@ resource "oci_core_instance_configuration" "instance_pool_configuration" {
         image_id                = local.instance_pool_image
       }
       launch_options {
-        network_type = "VFIO"
+        network_type = length(regexall("^VM\\..*\\.Ax\\.", var.instance_pool_shape)) > 0 ? "PARAVIRTUALIZED" : "VFIO"
       }
     }
   }
 
   source = "NONE"
 }
-
