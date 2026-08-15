@@ -58,19 +58,17 @@ attributes:
 
   dcv_eula_accept:
     widget: "check_box"
-    label: "Amazon DCV EULAを確認し、遵守することに同意します。"
+    label: "Amazon DCVが上記のとおりインストールされること、およびAmazon DCV EULAの適用を確認し、適用される条件を遵守することに同意します。"
     checked_value: 1
     unchecked_value: 0
     required: true
     cacheable: false
     help: |-
-      **Amazon DCV License Notice**
+      **Amazon DCVについて**
 
-      Amazon DCVはAmazon Web Services/NICEが提供する第三者ソフトウェアです。
+      Launchを実行すると、作成されるGPU計算ノードにAmazon DCV Serverが自動的にダウンロード・インストールされます。Amazon DCVはAmazon Web Servicesが提供する第三者ソフトウェアであり、Amazon DCV EULAが適用されます。
 
-      本環境ではAmazon DCVの評価ライセンスを使用します。評価ライセンスは評価・テスト目的に限定され、インストール後30日間有効です。本番利用には別途Amazon DCVのProduction Licenseが必要です。
-
-      Amazon DCVの利用にはAmazon DCV EULAが適用されます。
+      本構成では、Production License等が設定されていない場合、Amazon DCVのAutomatic Evaluation Licenseが使用されます。評価ライセンスはインストール後30日間有効で、短期のテスト・評価用途を対象としています。本番利用には適切なライセンスをご用意ください。
 
   bc_queue: "desktop-dcv"
 
