@@ -7,6 +7,12 @@ dcv_resolution="<%= %w[1280x720 1600x900 1920x1080].include?(context.dcv_resolut
 dcv_gl="<%= %w[on off].include?(context.dcv_gl.to_s) ? context.dcv_gl : 'on' %>"
 dcv_storage="<%= %w[home off].include?(context.dcv_storage.to_s) ? context.dcv_storage : 'home' %>"
 dcv_max_clients="<%= [[context.dcv_max_clients.to_i, 1].max, 4].min %>"
+dcv_eula_accept="<%= context.dcv_eula_accept.to_s == '1' ? '1' : '0' %>"
+
+if [[ "${dcv_eula_accept}" != "1" ]]; then
+  echo "ERROR: Amazon DCV EULAへの同意が必要です。" >&2
+  clean_up 1
+fi
 
 safe_user="${USER//[^[:alnum:]_-]/-}"
 session_id="ood-${safe_user}-${SLURM_JOB_ID:-$$}"

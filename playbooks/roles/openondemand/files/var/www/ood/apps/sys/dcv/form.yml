@@ -56,6 +56,22 @@ attributes:
     step: 1
     help: "ジョブと DCV セッションを維持する時間です。"
 
+  dcv_eula_accept:
+    widget: "check_box"
+    label: "Amazon DCV EULAを確認し、遵守することに同意します。"
+    checked_value: 1
+    unchecked_value: 0
+    required: true
+    cacheable: false
+    help: |-
+      **Amazon DCV License Notice**
+
+      Amazon DCVはAmazon Web Services/NICEが提供する第三者ソフトウェアです。
+
+      本環境ではAmazon DCVの評価ライセンスを使用します。評価ライセンスは評価・テスト目的に限定され、インストール後30日間有効です。本番利用には別途Amazon DCVのProduction Licenseが必要です。
+
+      Amazon DCVの利用にはAmazon DCV EULAが適用されます。
+
   bc_queue: "desktop-dcv"
 
 form:
@@ -65,4 +81,5 @@ form:
   - dcv_max_clients
   - dcv_storage
   - bc_num_hours
+  - dcv_eula_accept
   - bc_queue

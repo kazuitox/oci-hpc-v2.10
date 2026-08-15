@@ -1,5 +1,6 @@
 ---
-name: "Amazon DCV デスクトップ"
+name: "Linux Desktop with Amazon DCV"
+caption: "System Installed App"
 category: "02 環境アクセス"
 subcategory: Desktops
 role: batch_connect
