@@ -205,13 +205,13 @@
         name: desktop
       when:
         - use_ood | default(false) | bool
-        - queue | default('') == 'desktop-vnc'
+        - queue | default('') == 'vnc'
     - include_role:
         name: amazon-dcv
       when:
         - use_ood | default(false) | bool
         - ood_vnc_use_gpu | default(false) | bool
-        - queue | default('') == 'desktop-dcv'
+        - queue | default('') == 'dcv'
       
 - hosts: compute, slurm_backup
   vars:

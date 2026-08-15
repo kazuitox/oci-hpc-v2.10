@@ -1729,7 +1729,7 @@ variables:
     type: boolean
     title: Open OnDemand VNC / Amazon DCV に A10 GPU インスタンスを使用
     default: false
-    description: チェックするとVNC用のdesktop-vnc partitionはVM.GPU.A10.1とGPUデスクトップ用Custom Imageを使用し、同じGPU構成のdesktop-dcv partitionを追加します。Open OnDemandにはVNCとAmazon DCVの両方が表示され、それぞれ専用partitionへジョブを投入します。
+    description: チェックするとVNC用のvnc partitionはVM.GPU.A10.1とGPUデスクトップ用Custom Imageを使用し、同じGPU構成のdcv partitionを追加します。Open OnDemandにはVNCとAmazon DCVの両方が表示され、それぞれ専用partitionへジョブを投入します。
     visible:
       and:
       - ${use_ood}

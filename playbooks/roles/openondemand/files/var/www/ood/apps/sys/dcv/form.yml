@@ -8,7 +8,7 @@ attributes:
     value: "gnome"
     options:
       - ["GNOME", "gnome"]
-    help: "現在の desktop-dcv ノードイメージで利用できるデスクトップ環境です。"
+    help: "現在の dcv ノードイメージで利用できるデスクトップ環境です。"
     cacheable: false
 
   dcv_resolution:
@@ -70,7 +70,7 @@ attributes:
 
       本構成では、Production License等が設定されていない場合、Amazon DCVのAutomatic Evaluation Licenseが使用されます。評価ライセンスはインストール後30日間有効で、短期のテスト・評価用途を対象としています。本番利用には適切なライセンスをご用意ください。
 
-  bc_queue: "desktop-dcv"
+  bc_queue: "dcv"
 
 form:
   - desktop

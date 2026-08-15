@@ -15,7 +15,7 @@ attributes:
 
   bc_queue:
     label: "Queue / Partition"
-    value: "desktop-vnc"
+    value: "vnc"
     cacheable: false
 
 

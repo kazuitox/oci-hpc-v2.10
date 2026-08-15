@@ -49,13 +49,13 @@
           instance_pool_custom_memory: false
           marketplace_listing: HPC
           hyperthreading: true
-    - name: desktop-vnc
+    - name: vnc
       default: false
       instance_types:
-        - name: desktop-default
+        - name: dskv
           default: true
-          shape: VM.Standard.E6.Flex
-          instance_keyword: small
+          shape: VM.GPU.A10.1
+          instance_keyword: gpu-v
           permanent: false
           cluster_network: false
           compute_cluster: false
@@ -71,19 +71,19 @@
           boot_volume_size: 100
           use_marketplace_image: false
           use_compute_agent: true
-          instance_pool_ocpus: 2
+          instance_pool_ocpus: 8
           instance_pool_memory: 16
           instance_pool_custom_memory: true
           marketplace_listing: HPC_OL8
           hyperthreading: true
           tags: user
-    - name: desktop-dcv
+    - name: dcv
       default: false
       instance_types:
-        - name: desktop-default
+        - name: dskd
           default: true
           shape: VM.GPU.A10.1
-          instance_keyword: small
+          instance_keyword: gpu-d
           permanent: false
           cluster_network: false
           compute_cluster: false

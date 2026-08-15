@@ -1,6 +1,6 @@
 ---
 ood_dcv_enabled: "{{ ood_vnc_use_gpu | default(false) | bool }}"
-ood_dcv_queue: desktop-dcv
+ood_dcv_queue: dcv
 ood_dcv_expected_gpu: NVIDIA A10
 
 ood_dcv_version: "2025.0-20103"
