@@ -20,11 +20,16 @@ ood_dcv_vgl_group: "{{ ood_vnc_vgl_group | default('vglusers') }}"
 ood_dcv_rpms:
   - name: nice-dcv-server-2025.0.20103-1.el8.x86_64.rpm
     sha256: 7fee5b826a1326b3541960e489ed9f0bb028ca54cc5bd63b1617e920f7931cf8
+    verify_path: /usr/lib/systemd/system/dcvserver.service
   - name: nice-dcv-web-viewer-2025.0.20103-1.el8.x86_64.rpm
     sha256: 297f343a1b2957731bb35a9a141604f83abd02b2d11ddec6d2e336b1a811a585
+    verify_path: /usr/share/dcv/www/index.html
   - name: nice-xdcv-2025.0.688-1.el8.x86_64.rpm
     sha256: bade2233d79217c2868f0117c48c88a106e1b12d0e7cd63843f8b1a48cae5fd4
+    verify_path: /usr/bin/Xdcv
   - name: nice-dcv-gl-2025.0.1112-1.el8.x86_64.rpm
     sha256: 80bfed40233a06aac0cb4b99ccfcfeff800c71c62ad6a39a2bd70896c38fed3b
+    verify_path: /usr/sbin/dcvgladmin
   - name: nice-dcv-simple-external-authenticator-2025.0.282-1.el8.x86_64.rpm
     sha256: 232a7ac59c19573ce31f6b4c323ed2c30352b0c424f73e442e71cf159daebfad
+    verify_path: /usr/lib/systemd/system/dcvsimpleextauth.service

@@ -129,35 +129,47 @@
     state: present
     disable_gpg_check: false
 
-- name: Amazon DCV | Inspect installed server systemd unit
+- name: Amazon DCV | Inspect installed package payloads
   ansible.builtin.stat:
-    path: /usr/lib/systemd/system/dcvserver.service
-  register: ood_dcv_server_unit_initial
+    path: "{{ item.verify_path }}"
+  loop: "{{ ood_dcv_rpms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ood_dcv_payloads_initial
 
-- name: Amazon DCV | Restore server RPM when its systemd unit is missing
+- name: Amazon DCV | Restore RPM when its package payload is missing
   ansible.builtin.command:
     argv:
       - rpm
       - --upgrade
       - --replacepkgs
-      - "{{ ood_dcv_extract_dir }}/{{ ood_dcv_rpms[0].name }}"
-  when: not (ood_dcv_server_unit_initial.stat.exists | default(false))
+      - "{{ ood_dcv_extract_dir }}/{{ item.item.name }}"
+  loop: "{{ ood_dcv_payloads_initial.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not (item.stat.isreg | default(false))
   changed_when: true
 
-- name: Amazon DCV | Verify server systemd unit was installed
+- name: Amazon DCV | Verify installed package payloads
   ansible.builtin.stat:
-    path: /usr/lib/systemd/system/dcvserver.service
-  register: ood_dcv_server_unit
+    path: "{{ item.verify_path }}"
+  loop: "{{ ood_dcv_rpms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ood_dcv_payloads
 
-- name: Amazon DCV | Require server systemd unit
+- name: Amazon DCV | Require installed package payloads
   ansible.builtin.assert:
     that:
-      - ood_dcv_server_unit.stat.exists | default(false)
-      - ood_dcv_server_unit.stat.isreg | default(false)
+      - item.stat.exists | default(false)
+      - item.stat.isreg | default(false)
     fail_msg: >-
-      The nice-dcv-server RPM is registered as installed, but
-      /usr/lib/systemd/system/dcvserver.service is missing.
+      {{ item.item.name }} is registered as installed, but its required
+      payload {{ item.item.verify_path }} is missing after RPM restoration.
     quiet: true
+  loop: "{{ ood_dcv_payloads.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
 
 - name: Amazon DCV | Reload systemd units after RPM installation
   ansible.builtin.systemd:
