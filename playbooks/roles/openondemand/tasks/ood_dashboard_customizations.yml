@@ -8,16 +8,21 @@
     - ondemand.d
     - locales
 
-- name: OpenOnDemand dashboard | Install config overrides
-  ansible.builtin.copy:
-    src: "etc/ood/config/{{ item }}"
-    dest: "/etc/ood/config/{{ item }}"
+- name: OpenOnDemand dashboard | Render dashboard configuration
+  ansible.builtin.template:
+    src: ondemand.yml.j2
+    dest: /etc/ood/config/ondemand.d/ondemand.yml
     owner: root
     group: root
     mode: "0644"
-  loop:
-    - ondemand.d/ondemand.yml
-    - locales/en.yml
+
+- name: OpenOnDemand dashboard | Install locale override
+  ansible.builtin.copy:
+    src: etc/ood/config/locales/en.yml
+    dest: /etc/ood/config/locales/en.yml
+    owner: root
+    group: root
+    mode: "0644"
 
 - name: OpenOnDemand dashboard | Ensure system app override directories exist
   ansible.builtin.file:
@@ -50,3 +55,49 @@
     - myjobs/manifest.yml
     - shell/manifest.yml
     - system-status/manifest.yml
+
+- name: OpenOnDemand dashboard | Ensure Amazon DCV app directories exist
+  ansible.builtin.file:
+    path: "/var/www/ood/apps/sys/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - dcv
+    - dcv/template
+  when: ood_dcv_enabled | bool
+
+- name: OpenOnDemand dashboard | Install Amazon DCV app files
+  ansible.builtin.copy:
+    src: "var/www/ood/apps/sys/dcv/{{ item }}"
+    dest: "/var/www/ood/apps/sys/dcv/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - manifest.yml
+    - form.yml
+    - submit.yml.erb
+    - view.html.erb
+  when: ood_dcv_enabled | bool
+
+- name: OpenOnDemand dashboard | Install Amazon DCV job templates
+  ansible.builtin.copy:
+    src: "var/www/ood/apps/sys/dcv/template/{{ item }}"
+    dest: "/var/www/ood/apps/sys/dcv/template/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - before.sh.erb
+    - after.sh.erb
+    - script.sh.erb
+    - clean.sh.erb
+  when: ood_dcv_enabled | bool
+
+- name: OpenOnDemand dashboard | Remove disabled Amazon DCV app
+  ansible.builtin.file:
+    path: /var/www/ood/apps/sys/dcv
+    state: absent
+  when: not (ood_dcv_enabled | bool)

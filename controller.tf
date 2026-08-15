@@ -370,6 +370,7 @@ resource "null_resource" "cluster" {
       ood_vnc_image = local.ood_vnc_image,
       ood_vnc_shape = local.ood_vnc_shape,
       ood_vnc_instance_pool_ocpus = local.ood_vnc_instance_pool_ocpus,
+      ood_dcv_enabled = local.ood_vnc_gpu_enabled,
       use_marketplace_image = local.effective_use_marketplace_image,
       boot_volume_size = var.boot_volume_size,
       shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape,

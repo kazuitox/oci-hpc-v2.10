@@ -1,0 +1,68 @@
+---
+cluster: "myslurm"
+
+attributes:
+  desktop:
+    label: "Desktop Environment"
+    widget: select
+    value: "gnome"
+    options:
+      - ["GNOME", "gnome"]
+    help: "現在の desktop-dcv ノードイメージで利用できるデスクトップ環境です。"
+    cacheable: false
+
+  dcv_resolution:
+    label: "Initial display resolution"
+    widget: select
+    value: "1920x1080"
+    options:
+      - ["1280 x 720", "1280x720"]
+      - ["1600 x 900", "1600x900"]
+      - ["1920 x 1080", "1920x1080"]
+    help: "接続後は DCV の表示メニューから自動調整または別の解像度へ変更できます。"
+
+  dcv_gl:
+    label: "GPU-accelerated OpenGL"
+    widget: select
+    value: "on"
+    options:
+      - ["Enabled", "on"]
+      - ["Disabled", "off"]
+    help: "Enabled の場合は DCV-GL を使って A10 GPU を仮想セッションへ公開します。"
+
+  dcv_max_clients:
+    label: "Maximum concurrent clients"
+    widget: number_field
+    value: 1
+    min: 1
+    max: 4
+    step: 1
+    required: true
+    help: "同時に接続できる DCV クライアント数です。"
+
+  dcv_storage:
+    label: "File transfer"
+    widget: select
+    value: "home"
+    options:
+      - ["Enabled (home directory)", "home"]
+      - ["Disabled", "off"]
+    help: "Enabled の場合、DCV のファイル転送先をホームディレクトリに設定します。"
+
+  bc_num_hours:
+    label: "Number of hours"
+    value: 1
+    min: 1
+    step: 1
+    help: "ジョブと DCV セッションを維持する時間です。"
+
+  bc_queue: "desktop-dcv"
+
+form:
+  - desktop
+  - dcv_resolution
+  - dcv_gl
+  - dcv_max_clients
+  - dcv_storage
+  - bc_num_hours
+  - bc_queue

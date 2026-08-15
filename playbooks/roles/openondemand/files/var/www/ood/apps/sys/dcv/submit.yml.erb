@@ -1,0 +1,25 @@
+---
+batch_connect:
+  template: basic
+  password_size: 48
+  conn_params:
+    - session_id
+    - auth_token
+    - dcv_desktop
+    - dcv_resolution
+    - dcv_gl
+    - dcv_max_clients
+  script_wrapper: |
+    trap 'clean_up 143' TERM INT HUP
+    %s
+
+cluster: "myslurm"
+
+script:
+  native:
+    - "--partition=desktop-dcv"
+    - "--nodes=1"
+    - "--ntasks=1"
+    - "--gres=gpu:A10:1"
+    - "--cpus-per-task=8"
+    - "--job-name=ood-dcv"

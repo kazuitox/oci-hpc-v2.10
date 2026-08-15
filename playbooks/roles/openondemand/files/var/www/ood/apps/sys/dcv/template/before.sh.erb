@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+
+# Values are restricted to the choices declared in form.yml. The fallback
+# values also make a manually forged form submission harmless.
+dcv_desktop="<%= %w[gnome].include?(context.desktop.to_s) ? context.desktop : 'gnome' %>"
+dcv_resolution="<%= %w[1280x720 1600x900 1920x1080].include?(context.dcv_resolution.to_s) ? context.dcv_resolution : '1920x1080' %>"
+dcv_gl="<%= %w[on off].include?(context.dcv_gl.to_s) ? context.dcv_gl : 'on' %>"
+dcv_storage="<%= %w[home off].include?(context.dcv_storage.to_s) ? context.dcv_storage : 'home' %>"
+dcv_max_clients="<%= [[context.dcv_max_clients.to_i, 1].max, 4].min %>"
+
+safe_user="${USER//[^[:alnum:]_-]/-}"
+session_id="ood-${safe_user}-${SLURM_JOB_ID:-$$}"
+auth_token="$(create_passwd 48)"
+password=""
+port="$(find_port localhost 20000 65535)" || clean_up 1
+
+export session_id auth_token password port
+export dcv_desktop dcv_resolution dcv_gl dcv_max_clients
+
+dcv_fail() {
+  echo "ERROR: $*" >&2
+  clean_up 1
+}
+
+for command_name in dcv dcvsimpleextauth stunnel curl glxinfo; do
+  command -v "${command_name}" >/dev/null 2>&1 || \
+    dcv_fail "Required command is not installed on $(hostname): ${command_name}"
+done
+
+systemctl is-active --quiet dcvserver || \
+  dcv_fail "dcvserver is not active on $(hostname). Check the desktop Ansible role."
+systemctl is-active --quiet dcvsimpleextauth || \
+  dcv_fail "dcvsimpleextauth is not active on $(hostname). Check the desktop Ansible role."
+
+if dcv describe-session "${session_id}" >/dev/null 2>&1; then
+  dcv_fail "DCV session ID already exists: ${session_id}"
+fi
+
+create_args=(
+  create-session
+  --type=virtual
+  --owner "${USER}"
+  --name "Open OnDemand DCV job ${SLURM_JOB_ID:-unknown}"
+  --gl "${dcv_gl}"
+  --max-concurrent-clients "${dcv_max_clients}"
+)
+
+if [[ "${dcv_storage}" == "home" ]]; then
+  create_args+=(--storage-root "%home%")
+fi
+
+echo "Creating DCV virtual session '${session_id}' on $(hostname)..."
+dcv "${create_args[@]}" "${session_id}" || \
+  dcv_fail "Unable to create DCV virtual session."
+
+session_ready=false
+for _attempt in $(seq 1 120); do
+  if dcv describe-session "${session_id}" 2>/dev/null | grep -qi 'x display:'; then
+    session_ready=true
+    break
+  fi
+  sleep 1
+done
+
+[[ "${session_ready}" == true ]] || \
+  dcv_fail "DCV session did not become ready within 120 seconds."
+
+dcv set-display-layout --session "${session_id}" "${dcv_resolution}+0+0" || \
+  dcv_fail "Unable to set initial DCV display layout."
+
+if [[ "${dcv_gl}" == "on" ]]; then
+  session_description="$(dcv describe-session "${session_id}" 2>/dev/null)" || \
+    dcv_fail "Unable to inspect the DCV session for GPU validation."
+  dcv_display="$(
+    awk -F': ' 'tolower($1) ~ /x display/ { print $2; exit }' \
+      <<<"${session_description}"
+  )"
+  dcv_xauthority="$(
+    awk -F': ' 'tolower($1) ~ /x authority/ { print $2; exit }' \
+      <<<"${session_description}"
+  )"
+
+  [[ -n "${dcv_display}" && -r "${dcv_xauthority}" ]] || \
+    dcv_fail "DCV session display credentials are not ready for GPU validation."
+
+  dcv_gl_ready=false
+  dcv_glxinfo=""
+  for _attempt in $(seq 1 15); do
+    dcv_glxinfo="$(
+      DISPLAY="${dcv_display}" XAUTHORITY="${dcv_xauthority}" \
+        glxinfo -B 2>&1 || true
+    )"
+    if grep -Eq '^OpenGL vendor string:[[:space:]]+NVIDIA' <<<"${dcv_glxinfo}"; then
+      dcv_gl_ready=true
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ "${dcv_gl_ready}" != true ]]; then
+    printf '%s\n' "${dcv_glxinfo}" >&2
+    dcv_fail "The DCV virtual session is not using NVIDIA OpenGL."
+  fi
+
+  dcv_renderer="$(
+    awk -F': ' '/^OpenGL renderer string:/ { print $2; exit }' \
+      <<<"${dcv_glxinfo}"
+  )"
+  echo "DCV virtual session renderer: ${dcv_renderer}"
+fi
+
+printf '%s' "${auth_token}" | \
+  dcvsimpleextauth add-user --session "${session_id}" --user "${USER}" || \
+  dcv_fail "Unable to create the one-time DCV authentication token."
+
+echo "DCV session '${session_id}' is ready at ${dcv_resolution} (DCV-GL: ${dcv_gl})."

@@ -1,0 +1,9 @@
+---
+name: "Amazon DCV デスクトップ"
+category: "02 環境アクセス"
+subcategory: Desktops
+role: batch_connect
+icon: fa://desktop
+description: |-
+  Slurm が割り当てた GPU 計算ノード上に Amazon DCV 仮想セッションを作成します。
+  ジョブを停止すると DCV セッションも削除されます。

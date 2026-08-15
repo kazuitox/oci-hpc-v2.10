@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+if [[ -n "${session_id:-}" ]] && command -v dcv >/dev/null 2>&1; then
+  if dcv describe-session "${session_id}" >/dev/null 2>&1; then
+    echo "Closing DCV session '${session_id}'..."
+    dcv close-session "${session_id}" || true
+  fi
+fi
+
+if [[ -n "${session_id:-}" ]] && command -v dcvsimpleextauth >/dev/null 2>&1; then
+  dcvsimpleextauth remove-auth --session "${session_id}" >/dev/null 2>&1 || true
+fi
+
+auth_token=""

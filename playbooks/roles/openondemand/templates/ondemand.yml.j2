@@ -10,6 +10,9 @@ pinned_apps:
   - 'sys/myjobs'
   - 'sys/OpenComposer'
   - 'sys/system-status'
+{% if ood_dcv_enabled | bool %}
+  - 'sys/dcv'
+{% endif %}
 
 pinned_apps_menu_length: 15
 pinned_apps_group_by: category

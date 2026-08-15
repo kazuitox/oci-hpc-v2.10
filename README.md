@@ -74,6 +74,7 @@ HPC_OL8
 | `login_node` | ユーザー用の追加 Login Node を作成します。 |
 | `slurm_ha` | バックアップ Slurm Controller を作成します。 |
 | `use_ood` | Open OnDemand と OpenComposer をインストールします。 |
+| `ood_vnc_use_gpu` | VNC用の`desktop-vnc`にA10 GPUを使用し、DCV用の`desktop-dcv`パーティションとAmazon DCVデスクトップを有効化します。 |
 | `install_application` | 共有領域に追加アプリケーションをインストールします。Oracle Linux 8 と Ubuntu 24.04 で OpenFOAM v2312 / ParaView 5.11.2 を選択できます。Ubuntu 24.04 で OpenFOAM を選ぶと、controller 上の `/usr/mpi/gcc/openmpi-4.1.9a1` を使用してビルドします。 |
 | `ood_source_cidr` | Open OnDemand の HTTPS/443 へのアクセスを許可する送信元 CIDR。 |
 | `monitoring` | Grafana / Telegraf / InfluxDB によるシステム監視を有効化します。 |
@@ -275,6 +276,12 @@ cluster user add <name> --nossh --gid 9876
 ## Open OnDemand
 
 `use_ood` を有効にすると、Open OnDemand と [OpenComposer](https://github.com/RIKEN-RCCS/OpenComposer) をインストールします。ユーザーはブラウザからファイル操作、ジョブ投入、アプリケーション実行を行えます。スタックは Open OnDemand 用の初期パスワードも生成し、構成に反映します。
+
+`use_ood`を有効にするとVNC用の`desktop-vnc`パーティションを作成します。Oracle Linux 8で`ood_vnc_use_gpu`も有効にすると、`desktop-vnc`をA10 GPU構成にし、DCV専用の`desktop-dcv`パーティションを追加して、OODダッシュボードにVNCと「Amazon DCV デスクトップ」の両方を表示します。VNCジョブは`desktop-vnc`、DCVジョブは`desktop-dcv`へ投入され、ノード構築時のAnsibleもキュー名に応じてTurboVNCまたはAmazon DCVだけを構成します。Amazon DCV側では、利用時間、初期解像度、DCV-GL、同時接続数、ホームディレクトリとのファイル転送をフォームで指定できます。ジョブはA10 GPU 1基とCPU 8基を要求し、割り当てノード上にユーザー専用のDCV仮想セッションを作成します。ジョブ終了時にはセッションと48文字のワンタイム認証トークンを削除します。
+
+新しい`desktop-dcv`ノードでは、Slurmへの登録前にAmazon DCV 2025.0-20103を公式配布元からダウンロードし、アーカイブと各RPMのSHA-256およびRPM署名を検証してインストールします。その後、GDMのWayland無効化、`gdm`の`vglusers`追加、NVIDIA Xorg `:0`、DCV-GLを構成し、`glxinfo`と`dcvgldiag`でNVIDIA OpenGLを確認します。DCVセッション作成時にも仮想セッションのrendererがNVIDIAであることを検証します。デスクトップノードから`d1uj6qtbmh3dt5.cloudfront.net`へのHTTPS通信を許可してください。
+
+ブラウザー接続はOODの`/rnode/<host>/<port>/`を経由します。Webクライアントの経路はHTTPS/WSS（TCP）であり、QUIC/UDPは使用しません。検証したDCV 2025.0のデモライセンス表示は残り30日でした。継続運用には、環境に適用できる正式なDCVライセンスを設定してください。
 
 OpenComposer は `v2.0.2`（commit `7af3d94b36043d8019b1639cd8e463957eb7a37e`）に固定し、スタックの Slurm を直接利用するよう構成します。OpenComposer には、`queues.conf` のパーティションとノードグループ（Slurm Constraint）を選択できる汎用 Slurm ジョブフォームも追加します。Constraint の候補には各パーティションの `instance_types[].name`、つまり生成される `slurm.conf` の `NodeName` における `Features` の最後の値を使用します。パーティションを変更すると、そのパーティションで利用できる Constraint だけが選択肢として有効になります。実行プロファイル（MPI/Slurm）が `VM` の場合は `#SBATCH --ntasks-per-core=1` と `#SBATCH --exclusive`、`BM Standard` の場合は `#SBATCH --exclusive` のみをジョブスクリプトへ追加し、`BM HPC（RDMA）` ではどちらも追加しません。また、選択した実行プロファイルと MPI（`OpenMPI v4.x` または `Intel MPI(OneAPI)`）の組み合わせに対応する mpirun オプションを `export MPI_OPTIONS="..."` としてジョブスクリプトへ挿入します。実行時間の指定は有効・無効を選択でき、無効の場合は時間入力欄と `#SBATCH --time=` をジョブスクリプトから除外します。フォームで生成したジョブスクリプトは投入前に編集できます。Ruby の依存 gem には Open OnDemand 4.0 が同梱する gem セットを利用します。
 

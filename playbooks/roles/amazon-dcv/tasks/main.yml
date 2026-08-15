@@ -1,0 +1,21 @@
+---
+- name: Amazon DCV | Validate supported platform
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == 'RedHat'
+      - ansible_distribution == 'OracleLinux'
+      - ansible_distribution_major_version | string == '8'
+      - ansible_architecture == 'x86_64'
+    fail_msg: >-
+      Amazon DCV Batch Connect is supported by this stack only on
+      Oracle Linux 8 x86_64 desktop nodes.
+    quiet: true
+  when:
+    - ood_dcv_enabled | bool
+    - queue | default('') == ood_dcv_queue
+
+- name: Amazon DCV | Configure Oracle Linux 8 desktop node
+  ansible.builtin.include_tasks: el8.yml
+  when:
+    - ood_dcv_enabled | bool
+    - queue | default('') == ood_dcv_queue
