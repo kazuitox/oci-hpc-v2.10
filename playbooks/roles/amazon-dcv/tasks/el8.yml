@@ -129,9 +129,43 @@
     state: present
     disable_gpg_check: false
 
+- name: Amazon DCV | Inspect installed server systemd unit
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/dcvserver.service
+  register: ood_dcv_server_unit_initial
+
+- name: Amazon DCV | Restore server RPM when its systemd unit is missing
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - --upgrade
+      - --replacepkgs
+      - "{{ ood_dcv_extract_dir }}/{{ ood_dcv_rpms[0].name }}"
+  when: not (ood_dcv_server_unit_initial.stat.exists | default(false))
+  changed_when: true
+
+- name: Amazon DCV | Verify server systemd unit was installed
+  ansible.builtin.stat:
+    path: /usr/lib/systemd/system/dcvserver.service
+  register: ood_dcv_server_unit
+
+- name: Amazon DCV | Require server systemd unit
+  ansible.builtin.assert:
+    that:
+      - ood_dcv_server_unit.stat.exists | default(false)
+      - ood_dcv_server_unit.stat.isreg | default(false)
+    fail_msg: >-
+      The nice-dcv-server RPM is registered as installed, but
+      /usr/lib/systemd/system/dcvserver.service is missing.
+    quiet: true
+
+- name: Amazon DCV | Reload systemd units after RPM installation
+  ansible.builtin.systemd:
+    daemon_reload: true
+
 - name: Amazon DCV | Stop server before configuring the GPU display
   ansible.builtin.systemd:
-    name: dcvserver
+    name: dcvserver.service
     state: stopped
 
 - name: Amazon DCV | Verify NVIDIA A10 is present
