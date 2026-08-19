@@ -65,6 +65,16 @@ data "oci_core_images" "linux" {
   }
 }
 
+data "oci_core_shapes" "available_shapes" {
+  # Keep this regional: availability_domain would incorrectly exclude shapes offered in other ADs.
+  compartment_id = var.targetCompartment
+
+  filter {
+    name   = "name"
+    values = tolist(local.required_compute_node_custom_image_compatible_shapes)
+  }
+}
+
 data "oci_resourcemanager_private_endpoint_reachable_ip" "private_endpoint_reachable_ip" {
     #Required
     count = var.private_deployment ? 1 : 0

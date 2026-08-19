@@ -1,5 +1,17 @@
+locals {
+  required_compute_node_custom_image_compatible_shapes = toset([
+    "VM.Standard.E6.Ax.Flex",
+    "VM.Standard4.Ax.Flex",
+    "BM.Standard.E6.Ax.192",
+  ])
+  available_compute_node_custom_image_compatible_shapes = setintersection(
+    local.required_compute_node_custom_image_compatible_shapes,
+    toset(data.oci_core_shapes.available_shapes.shapes[*].name),
+  )
+}
+
 resource "oci_core_image" "compute_node_custom_image" {
-  count = local.effective_import_compute_image && !local.effective_use_marketplace_image ? 1 : 0
+  count = local.use_imported_compute_image ? 1 : 0
 
   compartment_id = var.targetCompartment
   display_name   = local.compute_image_display_name
@@ -10,6 +22,14 @@ resource "oci_core_image" "compute_node_custom_image" {
     operating_system         = local.compute_image_operating_system
     operating_system_version = local.compute_image_operating_system_version
   }
+}
+
+resource "oci_core_shape_management" "compute_node_custom_image_compatible_shapes" {
+  for_each = local.use_imported_compute_image ? local.available_compute_node_custom_image_compatible_shapes : toset([])
+
+  compartment_id = var.targetCompartment
+  image_id       = oci_core_image.compute_node_custom_image[0].id
+  shape_name     = each.value
 }
 
 resource "oci_core_image" "compute_node_gpgpu_custom_image" {

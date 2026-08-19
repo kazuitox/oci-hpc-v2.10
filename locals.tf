@@ -27,15 +27,16 @@ locals {
   simple_preinstalled_compute_image   = local.cluster_os_key == "Ubuntu24.04" ? true : var.use_preinstalled_compute_image
   effective_use_marketplace_image     = local.simple_mode ? !local.simple_preinstalled_compute_image : var.use_marketplace_image
   effective_import_compute_image      = local.simple_mode ? local.simple_preinstalled_compute_image : var.import_compute_image_from_object_storage
-  use_ubuntu_controller_custom_image  = local.simple_mode && local.cluster_os_key == "Ubuntu24.04"
+  use_imported_compute_image           = local.effective_import_compute_image && !local.effective_use_marketplace_image
+  use_imported_compute_image_for_controller = local.simple_mode && local.use_imported_compute_image
   import_gpgpu_compute_image          = local.simple_mode && local.cluster_os_key == "Ubuntu24.04" && var.import_gpcpu_image_from_object_storage
-  effective_use_marketplace_image_controller = local.use_ubuntu_controller_custom_image ? false : var.use_marketplace_image_controller
+  effective_use_marketplace_image_controller = local.use_imported_compute_image_for_controller ? false : var.use_marketplace_image_controller
   compute_image_source_uri            = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.source_uri : var.compute_image_source_uri
   compute_image_display_name          = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.display_name : var.compute_image_display_name
   compute_image_operating_system      = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.operating_system : var.compute_image_operating_system
   compute_image_operating_system_version = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.operating_system_version : var.compute_image_operating_system_version
   compute_username                    = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.username : var.compute_username
-  controller_username                 = local.use_ubuntu_controller_custom_image ? local.simple_compute_image.username : var.controller_username
+  controller_username                 = local.use_imported_compute_image_for_controller ? local.compute_username : var.controller_username
 
   region_map = {
     for region in data.oci_identity_regions.regions.regions :
@@ -47,7 +48,12 @@ locals {
   cluster_instances_ids = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.id : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.id : data.oci_core_instance.instance_pool_instances.*.id
   cluster_instances_names = var.compute_cluster ? oci_core_instance.compute_cluster_instances.*.display_name : var.cluster_network ? data.oci_core_instance.cluster_network_instances.*.display_name : data.oci_core_instance.instance_pool_instances.*.display_name
 
-  image_ocid = local.effective_import_compute_image && !local.effective_use_marketplace_image ? oci_core_image.compute_node_custom_image[0].id : (
+  // Source the image OCID from all compatibility entries so deployments wait for their registration.
+  imported_compute_image_ocid = one(toset(concat(
+    oci_core_image.compute_node_custom_image[*].id,
+    [for compatibility in oci_core_shape_management.compute_node_custom_image_compatible_shapes : compatibility.image_id],
+  )))
+  image_ocid = local.use_imported_compute_image ? local.imported_compute_image_ocid : (
     var.unsupported ? var.image_ocid : var.image
   )
   custom_controller_image_ocid = var.unsupported_controller ? var.unsupported_controller_image : var.custom_controller_image
@@ -85,7 +91,7 @@ locals {
   
   cluster_name = var.use_custom_name ? var.cluster_name : random_pet.name.id
 
-  controller_image = local.use_ubuntu_controller_custom_image ? local.image_ocid : (
+  controller_image = local.use_imported_compute_image_for_controller ? local.image_ocid : (
     local.effective_use_marketplace_image_controller ? oci_core_app_catalog_subscription.controller_mp_image_subscription[0].listing_resource_id : local.custom_controller_image_ocid
   )
 

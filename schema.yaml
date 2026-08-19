@@ -842,6 +842,9 @@ variables:
           - VM.Standard.E6.Flex
         - eq:
           - ${controller_shape}
+          - VM.Standard.E6.Ax.Flex
+        - eq:
+          - ${controller_shape}
           - VM.Optimized3.Flex
         - eq:
           - ${controller_shape}
@@ -849,6 +852,9 @@ variables:
         - eq:
           - ${controller_shape}
           - VM.Standard3.Flex
+        - eq:
+          - ${controller_shape}
+          - VM.Standard4.Ax.Flex
     required: true
   controller_ocpus_denseIO_flex:
     title: コア数
@@ -893,10 +899,16 @@ variables:
           - VM.Standard.E6.Flex
         - eq:
           - ${controller_shape}
+          - VM.Standard.E6.Ax.Flex
+        - eq:
+          - ${controller_shape}
           - VM.Standard.A1.Flex
         - eq:
           - ${controller_shape}
           - VM.Standard3.Flex
+        - eq:
+          - ${controller_shape}
+          - VM.Standard4.Ax.Flex
   controller_memory:
     title: メモリサイズ (GB)
     type: integer
@@ -925,10 +937,16 @@ variables:
             - VM.Standard.E6.Flex
           - eq:
             - ${controller_shape}
+            - VM.Standard.E6.Ax.Flex
+          - eq:
+            - ${controller_shape}
             - VM.Standard.A1.Flex
           - eq:
             - ${controller_shape}
             - VM.Standard3.Flex
+          - eq:
+            - ${controller_shape}
+            - VM.Standard4.Ax.Flex
       - and:
         - ${controller_custom_memory}
     required: true
@@ -1165,10 +1183,16 @@ variables:
           - VM.Standard.E6.Flex
         - eq:
           - ${instance_pool_shape}
+          - VM.Standard.E6.Ax.Flex
+        - eq:
+          - ${instance_pool_shape}
           - VM.Standard.A1.Flex
         - eq:
           - ${instance_pool_shape}
           - VM.Standard3.Flex
+        - eq:
+          - ${instance_pool_shape}
+          - VM.Standard4.Ax.Flex
     required: true
   instance_pool_ocpus_denseIO_flex:
     title: コア数
@@ -1215,10 +1239,16 @@ variables:
           - VM.Standard.E6.Flex
         - eq:
           - ${instance_pool_shape}
+          - VM.Standard.E6.Ax.Flex
+        - eq:
+          - ${instance_pool_shape}
           - VM.Standard.A1.Flex
         - eq:
           - ${instance_pool_shape}
           - VM.Standard3.Flex
+        - eq:
+          - ${instance_pool_shape}
+          - VM.Standard4.Ax.Flex
   instance_pool_memory:
     title: メモリサイズ (GB)
     type: integer
@@ -1247,10 +1277,16 @@ variables:
             - VM.Standard.E6.Flex
           - eq:
             - ${instance_pool_shape}
+            - VM.Standard.E6.Ax.Flex
+          - eq:
+            - ${instance_pool_shape}
             - VM.Standard.A1.Flex
           - eq:
             - ${instance_pool_shape}
             - VM.Standard3.Flex
+          - eq:
+            - ${instance_pool_shape}
+            - VM.Standard4.Ax.Flex
       - and:
         - ${instance_pool_custom_memory}
         - not:
@@ -1336,7 +1372,7 @@ variables:
   use_preinstalled_compute_image:
     type: boolean
     title: 必要パッケージがインストール済みの Compute Image を使用
-    description: チェックすると Object Storage URI から Custom Image を登録して compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため controller と compute node に常に Custom Image を使用します。
+    description: チェックすると Object Storage URI から Custom Image を登録して controller と compute node に使用します。チェックしない場合、Oracle Linux 8 では Marketplace Image を使用します。Ubuntu 24.04 は Marketplace Image がないため controller と compute node に常に Custom Image を使用します。
     default: true
     visible:
       and:
@@ -2127,6 +2163,9 @@ variables:
           - VM.Standard.E6.Flex
         - eq:
           - ${login_shape}
+          - VM.Standard.E6.Ax.Flex
+        - eq:
+          - ${login_shape}
           - VM.Optimized3.Flex
         - eq:
           - ${login_shape}
@@ -2134,6 +2173,9 @@ variables:
         - eq:
           - ${login_shape}
           - VM.Standard3.Flex
+        - eq:
+          - ${login_shape}
+          - VM.Standard4.Ax.Flex
       - ${login_node}
     required: true
   login_ocpus_denseIO_flex:
@@ -2180,10 +2222,16 @@ variables:
           - VM.Standard.E6.Flex
         - eq:
           - ${login_shape}
+          - VM.Standard.E6.Ax.Flex
+        - eq:
+          - ${login_shape}
           - VM.Standard.A1.Flex
         - eq:
           - ${login_shape}
           - VM.Standard3.Flex
+        - eq:
+          - ${login_shape}
+          - VM.Standard4.Ax.Flex
       - ${login_node}
   login_memory:
     title: メモリサイズ (GB)
@@ -2213,10 +2261,16 @@ variables:
             - VM.Standard.E6.Flex
           - eq:
             - ${login_shape}
+            - VM.Standard.E6.Ax.Flex
+          - eq:
+            - ${login_shape}
             - VM.Standard.A1.Flex
           - eq:
             - ${login_shape}
             - VM.Standard3.Flex
+          - eq:
+            - ${login_shape}
+            - VM.Standard4.Ax.Flex
       - and:
         - ${login_custom_memory}
         - ${login_node}
