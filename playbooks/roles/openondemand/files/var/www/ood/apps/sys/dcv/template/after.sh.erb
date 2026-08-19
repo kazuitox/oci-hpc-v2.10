@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+echo "Waiting for the OOD-to-DCV stunnel relay on ${host}:${port}..."
+wait_until_port_used "${host}:${port}" 30 || clean_up 1
+
+dcv_version=""
+for _attempt in $(seq 1 5); do
+  if dcv_version="$(
+    curl --noproxy '*' \
+      --fail \
+      --silent \
+      --show-error \
+      --connect-timeout 5 \
+      --max-time 10 \
+      "http://127.0.0.1:${port}/version"
+  )"; then
+    break
+  fi
+  sleep 1
+done
+
+[[ -n "${dcv_version}" ]] || clean_up 1
+
+echo "DCV stunnel relay is ready (Amazon DCV ${dcv_version})."

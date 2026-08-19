@@ -1,0 +1,19 @@
+<%
+  dcv_host = connect.host.to_s
+  dcv_port = connect.port.to_i
+  dcv_session = connect.session_id.to_s
+  dcv_token = ERB::Util.url_encode(connect.auth_token.to_s)
+  dcv_url = "/rnode/#{dcv_host}/#{dcv_port}/?authToken=#{dcv_token}##{dcv_session}"
+%>
+
+<a class="btn btn-primary" href="<%= dcv_url %>" target="_blank" rel="noopener">
+  <i class="fas fa-desktop" aria-hidden="true"></i>
+  Amazon DCV を開く
+</a>
+
+割り当てノード: `<%= dcv_host %>`<br>
+セッション ID: `<%= dcv_session %>`<br>
+初期解像度: `<%= connect.dcv_resolution %>`<br>
+DCV-GL: `<%= connect.dcv_gl %>`
+
+この接続 URL は当該ジョブ専用です。ジョブを停止すると DCV セッションと認証トークンも削除されます。

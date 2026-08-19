@@ -159,6 +159,23 @@ def getInstanceType(config, queue_name, instance_keyword):
     return None
 
 
+def parseClusterName(config, cluster_name):
+    # Cluster directories use <queue>-<index>-<instance_keyword>. Resolve the
+    # queue from queues.conf so queue names containing '-' remain unambiguous.
+    for partition in sorted(config, key=lambda item: len(item["name"]), reverse=True):
+        queue_name = partition["name"]
+        prefix = queue_name + '-'
+        if not cluster_name.startswith(prefix):
+            continue
+        remainder = cluster_name[len(prefix):]
+        cluster_number, separator, instance_keyword = remainder.partition('-')
+        if not separator or not cluster_number.isdigit():
+            continue
+        if any(instance_keyword == item["instance_keyword"] for item in partition["instance_types"]):
+            return queue_name, int(cluster_number), instance_keyword
+    return None
+
+
 def isPermanent(config, queue_name, instance_type_name):
     for partition in config:
         if queue_name == partition["name"]:
@@ -271,11 +288,10 @@ def getstatus_slurm():
                     clusters_data[clustername]["min_idle"] = node_idle
 
     for clusterName in os.listdir(clusters_path):
-        if len(clusterName.split('-')) < 3:
+        cluster_details = parseClusterName(config, clusterName)
+        if cluster_details is None:
             continue
-        instance_keyword = '-'.join(clusterName.split('-')[2:])
-        clusterNumber = int(clusterName.split('-')[1])
-        queue = clusterName.split('-')[0]
+        queue, clusterNumber, instance_keyword = cluster_details
         instanceType = getInstanceType(config, queue, instance_keyword)
         if queue not in used_index:
             used_index[queue] = {}

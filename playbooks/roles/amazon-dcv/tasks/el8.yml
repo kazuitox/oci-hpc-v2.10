@@ -1,0 +1,418 @@
+---
+- name: Amazon DCV | Ensure VirtualGL users group exists
+  ansible.builtin.group:
+    name: "{{ ood_dcv_vgl_group }}"
+    gid: "{{ ood_vnc_vgl_gid | default(9877) }}"
+    state: present
+
+- name: Amazon DCV | Add compute user to VirtualGL users group
+  ansible.builtin.user:
+    name: "{{ compute_username | default('opc') }}"
+    groups: "{{ ood_dcv_vgl_group }}"
+    append: true
+
+- name: Amazon DCV | Install "Server with GUI" package group
+  vars:
+    package_name:
+      - "@Server with GUI"
+    package_state: present
+    package_exclude:
+      - "kernel*"
+  ansible.builtin.include_role:
+    name: safe_yum
+
+- name: Amazon DCV | Install provisioning prerequisites
+  ansible.builtin.dnf:
+    name:
+      - glx-utils
+      - psmisc
+      - stunnel
+    state: present
+
+- name: Amazon DCV | Create package cache directory
+  ansible.builtin.file:
+    path: "{{ ood_dcv_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Amazon DCV | Download pinned server archive
+  ansible.builtin.get_url:
+    url: "{{ ood_dcv_archive_url }}"
+    dest: "{{ ood_dcv_archive_path }}"
+    checksum: "sha256:{{ ood_dcv_archive_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_dcv_archive_download
+  retries: 3
+  delay: 5
+  until: ood_dcv_archive_download is succeeded
+
+- name: Amazon DCV | Download RPM signing key
+  ansible.builtin.get_url:
+    url: "{{ ood_dcv_gpg_key_url }}"
+    dest: "{{ ood_dcv_gpg_key_path }}"
+    checksum: "sha256:{{ ood_dcv_gpg_key_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_dcv_key_download
+  retries: 3
+  delay: 5
+  until: ood_dcv_key_download is succeeded
+
+- name: Amazon DCV | Extract pinned server archive
+  ansible.builtin.unarchive:
+    src: "{{ ood_dcv_archive_path }}"
+    dest: "{{ ood_dcv_cache_dir }}"
+    remote_src: true
+    creates: "{{ ood_dcv_extract_dir }}/{{ ood_dcv_rpms[0].name }}"
+
+- name: Amazon DCV | Calculate RPM SHA-256 checksums
+  ansible.builtin.stat:
+    path: "{{ ood_dcv_extract_dir }}/{{ item.name }}"
+    checksum_algorithm: sha256
+  loop: "{{ ood_dcv_rpms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ood_dcv_rpm_stats
+
+- name: Amazon DCV | Verify pinned RPM checksums
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists | default(false)
+      - item.stat.isreg | default(false)
+      - item.stat.checksum | default('') == item.item.sha256
+    fail_msg: "Amazon DCV RPM checksum mismatch: {{ item.item.name }}"
+    quiet: true
+  loop: "{{ ood_dcv_rpm_stats.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Amazon DCV | Import RPM signing key
+  ansible.builtin.rpm_key:
+    key: "{{ ood_dcv_gpg_key_path }}"
+    state: present
+
+- name: Amazon DCV | Verify RPM signatures
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - --checksig
+      - "{{ ood_dcv_extract_dir }}/{{ item.name }}"
+  loop: "{{ ood_dcv_rpms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ood_dcv_rpm_signatures
+  changed_when: false
+
+- name: Amazon DCV | Require valid RPM signatures
+  ansible.builtin.assert:
+    that:
+      - item.rc == 0
+      - "'digests signatures OK' in item.stdout"
+    fail_msg: "Amazon DCV RPM signature verification failed: {{ item.item.name }}"
+    quiet: true
+  loop: "{{ ood_dcv_rpm_signatures.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Amazon DCV | Install signed server packages
+  ansible.builtin.dnf:
+    name: >-
+      {{ ood_dcv_rpms
+         | map(attribute='name')
+         | map('regex_replace', '^(.*)$', ood_dcv_extract_dir + '/\\1')
+         | list }}
+    state: present
+    disable_gpg_check: false
+
+- name: Amazon DCV | Inspect installed package payloads
+  ansible.builtin.stat:
+    path: "{{ item.verify_path }}"
+  loop: "{{ ood_dcv_rpms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ood_dcv_payloads_initial
+
+- name: Amazon DCV | Restore RPM when its package payload is missing
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - --upgrade
+      - --replacepkgs
+      - "{{ ood_dcv_extract_dir }}/{{ item.item.name }}"
+  loop: "{{ ood_dcv_payloads_initial.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not (item.stat.isreg | default(false))
+  changed_when: true
+
+- name: Amazon DCV | Verify installed package payloads
+  ansible.builtin.stat:
+    path: "{{ item.verify_path }}"
+  loop: "{{ ood_dcv_rpms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: ood_dcv_payloads
+
+- name: Amazon DCV | Require installed package payloads
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists | default(false)
+      - item.stat.isreg | default(false)
+    fail_msg: >-
+      {{ item.item.name }} is registered as installed, but its required
+      payload {{ item.item.verify_path }} is missing after RPM restoration.
+    quiet: true
+  loop: "{{ ood_dcv_payloads.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Amazon DCV | Reload systemd units after RPM installation
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Amazon DCV | Stop server before configuring the GPU display
+  ansible.builtin.systemd:
+    name: dcvserver.service
+    state: stopped
+
+- name: Amazon DCV | Verify NVIDIA A10 is present
+  ansible.builtin.command:
+    argv:
+      - nvidia-smi
+      - --query-gpu=name
+      - --format=csv,noheader
+  register: ood_dcv_nvidia_gpu
+  changed_when: false
+
+- name: Amazon DCV | Validate NVIDIA GPU model
+  ansible.builtin.assert:
+    that:
+      - ood_dcv_expected_gpu in ood_dcv_nvidia_gpu.stdout
+    fail_msg: >-
+      Amazon DCV expected {{ ood_dcv_expected_gpu }}, but nvidia-smi returned:
+      {{ ood_dcv_nvidia_gpu.stdout | trim }}
+    quiet: true
+
+- name: Amazon DCV | Verify GDM account exists
+  ansible.builtin.command:
+    argv:
+      - getent
+      - passwd
+      - gdm
+  changed_when: false
+
+- name: Amazon DCV | Verify VirtualGL access group exists
+  ansible.builtin.command:
+    argv:
+      - getent
+      - group
+      - "{{ ood_dcv_vgl_group }}"
+  changed_when: false
+
+- name: Amazon DCV | Force GDM to use Xorg instead of Wayland
+  ansible.builtin.lineinfile:
+    path: /etc/gdm/custom.conf
+    regexp: '^\s*#?\s*WaylandEnable\s*='
+    line: 'WaylandEnable=false'
+    insertafter: '^\[daemon\]\s*$'
+
+- name: Amazon DCV | Inspect NVIDIA Xorg configuration
+  ansible.builtin.stat:
+    path: /etc/X11/xorg.conf
+  register: ood_dcv_xorg_config
+
+- name: Amazon DCV | Require NVIDIA Xorg configuration
+  ansible.builtin.assert:
+    that:
+      - ood_dcv_xorg_config.stat.exists | default(false)
+      - ood_dcv_xorg_config.stat.isreg | default(false)
+    fail_msg: >-
+      /etc/X11/xorg.conf is missing. Use the stack's A10 GPU desktop image
+      or configure the NVIDIA X server before enabling Amazon DCV.
+    quiet: true
+
+- name: Amazon DCV | Configure NVIDIA Xorg for a headless GPU
+  ansible.builtin.lineinfile:
+    path: /etc/X11/xorg.conf
+    regexp: '^\s*Option\s+"UseDisplayDevice"\s+'
+    line: '    Option         "UseDisplayDevice" "none"'
+    insertafter: '^\s*Driver\s+"nvidia"\s*$'
+
+- name: Amazon DCV | Stop GDM before reconfiguring DCV-GL
+  ansible.builtin.systemd:
+    name: gdm
+    state: stopped
+
+- name: Amazon DCV | Check whether X display zero is still in use
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/fuser
+      - /tmp/.X11-unix/X0
+  register: ood_dcv_display_zero_users
+  changed_when: false
+  failed_when: ood_dcv_display_zero_users.rc not in [0, 1]
+
+- name: Amazon DCV | Refuse to replace an active X display zero socket
+  ansible.builtin.assert:
+    that:
+      - ood_dcv_display_zero_users.rc == 1
+    fail_msg: >-
+      X display :0 is still in use. Stop existing VNC/DCV sessions before
+      provisioning the NVIDIA X server.
+    quiet: true
+
+- name: Amazon DCV | Remove stale X display zero files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/.X11-unix/X0
+    - /tmp/.X0-lock
+
+- name: Amazon DCV | Allow GDM to access VirtualGL resources
+  ansible.builtin.user:
+    name: gdm
+    groups: "{{ ood_dcv_vgl_group }}"
+    append: true
+
+- name: Amazon DCV | Disable DCV-GL before refreshing X access
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/dcvgladmin
+      - disable
+      - "64"
+
+- name: Amazon DCV | Enable DCV-GL for the NVIDIA X server
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/dcvgladmin
+      - enable
+      - "64"
+
+- name: Amazon DCV | Read the default systemd target
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - get-default
+  register: ood_dcv_default_target
+  changed_when: false
+
+- name: Amazon DCV | Make graphical.target the default target
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - set-default
+      - graphical.target
+  when: ood_dcv_default_target.stdout | trim != 'graphical.target'
+
+- name: Amazon DCV | Start graphical.target
+  ansible.builtin.systemd:
+    name: graphical.target
+    state: started
+
+- name: Amazon DCV | Enable and start GDM
+  ansible.builtin.systemd:
+    name: gdm
+    enabled: true
+    state: started
+
+- name: Amazon DCV | Wait for physical X display zero
+  ansible.builtin.wait_for:
+    path: /tmp/.X11-unix/X0
+    state: present
+    timeout: 60
+
+- name: Amazon DCV | Verify physical X display uses NVIDIA OpenGL
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      xauthority="$(
+        ps -eo args= |
+          sed -n '/[X]org .* -auth / { s/.* -auth \([^ ]*\).*/\1/p; q; }'
+      )"
+      test -n "${xauthority}"
+      DISPLAY=:0 XAUTHORITY="${xauthority}" /usr/bin/glxinfo -B
+    executable: /bin/bash
+  register: ood_dcv_glxinfo
+  changed_when: false
+  retries: 30
+  delay: 2
+  until: >-
+    ood_dcv_glxinfo.rc == 0 and
+    ood_dcv_glxinfo.stdout is search('OpenGL vendor string:\\s+NVIDIA')
+
+- name: Amazon DCV | Run DCV-GL diagnostics
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/dcvgldiag
+  args:
+    chdir: /var/tmp
+  register: ood_dcv_gl_diagnostics
+  changed_when: false
+  failed_when: >-
+    ood_dcv_gl_diagnostics.rc not in [0, 3] or
+    'ERROR (' in ood_dcv_gl_diagnostics.stdout
+  retries: 5
+  delay: 2
+  until: >-
+    ood_dcv_gl_diagnostics.rc in [0, 3] and
+    'ERROR (' not in ood_dcv_gl_diagnostics.stdout
+
+- name: Amazon DCV | Configure NVIDIA display section
+  ansible.builtin.lineinfile:
+    path: /etc/dcv/dcv.conf
+    regexp: '^\[display/linux\]\s*$'
+    line: '[display/linux]'
+    insertafter: EOF
+
+- name: Amazon DCV | Pin DCV-GL to physical NVIDIA display
+  ansible.builtin.lineinfile:
+    path: /etc/dcv/dcv.conf
+    regexp: '^\s*#?\s*gl-displays\s*='
+    line: "gl-displays = [':0.0']"
+    insertafter: '^\[display/linux\]\s*$'
+
+- name: Amazon DCV | Configure one-time token authentication
+  ansible.builtin.lineinfile:
+    path: /etc/dcv/dcv.conf
+    regexp: '^\s*#?\s*auth-token-verifier='
+    line: 'auth-token-verifier="http://127.0.0.1:8444"'
+    insertafter: '^\[security\]\s*$'
+
+- name: Amazon DCV | Enable and start external authenticator
+  ansible.builtin.systemd:
+    name: dcvsimpleextauth
+    enabled: true
+    state: started
+
+- name: Amazon DCV | Enable and start server
+  ansible.builtin.systemd:
+    name: dcvserver
+    enabled: true
+    state: started
+
+- name: Amazon DCV | Verify HTTPS endpoint
+  ansible.builtin.uri:
+    url: https://127.0.0.1:8443/version
+    method: GET
+    validate_certs: false
+    return_content: true
+    status_code: 200
+  register: ood_dcv_version_response
+  retries: 10
+  delay: 1
+  until: ood_dcv_version_response.status == 200
+
+- name: Amazon DCV | Verify server version response
+  ansible.builtin.assert:
+    that:
+      - ood_dcv_version_response.content | trim == ood_dcv_version
+    fail_msg: >-
+      Unexpected Amazon DCV version response:
+      {{ ood_dcv_version_response.content | default('no response') }}
+    quiet: true

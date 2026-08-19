@@ -203,7 +203,15 @@
   tasks:
     - include_role:
         name: desktop
-      when: use_ood|default(false)|bool
+      when:
+        - use_ood | default(false) | bool
+        - queue | default('') == 'vnc'
+    - include_role:
+        name: amazon-dcv
+      when:
+        - use_ood | default(false) | bool
+        - ood_vnc_use_gpu | default(false) | bool
+        - queue | default('') == 'dcv'
       
 - hosts: compute, slurm_backup
   vars:
@@ -235,11 +243,3 @@
     - include_role: 
         name: telegraf
       when: monitoring|default(false)|bool
-
-- hosts: compute
-  become: true
-  gather_facts: true
-  tasks:
-    - include_role:
-        name: desktop
-      when: use_ood|default(false)|bool

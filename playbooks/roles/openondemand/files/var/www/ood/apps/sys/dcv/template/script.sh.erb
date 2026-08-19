@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+stunnel_config="<%= session.staged_root.join('stunnel.conf') %>"
+
+(
+  umask 077
+  {
+    printf '%s\n' 'foreground = yes'
+    printf '%s\n' 'client = yes'
+    printf '%s\n' 'syslog = no'
+    printf '%s\n' 'debug = notice'
+    printf '%s\n' 'verify = 0'
+    printf '%s\n' 'socket = l:TCP_NODELAY=1'
+    printf '%s\n' 'socket = r:TCP_NODELAY=1'
+    printf '%s\n' '[dcv]'
+    printf 'accept = 0.0.0.0:%s\n' "${port}"
+    printf '%s\n' 'connect = 127.0.0.1:8443'
+    printf '%s\n' 'TIMEOUTclose = 0'
+  } > "${stunnel_config}"
+)
+
+stunnel "${stunnel_config}" &
+stunnel_pid=$!
+
+stop_stunnel() {
+  if kill -0 "${stunnel_pid}" 2>/dev/null; then
+    kill -TERM "${stunnel_pid}" 2>/dev/null || true
+    wait "${stunnel_pid}" 2>/dev/null || true
+  fi
+}
+
+trap 'stop_stunnel; exit 143' TERM INT HUP
+trap stop_stunnel EXIT
+
+while kill -0 "${stunnel_pid}" 2>/dev/null; do
+  if ! dcv describe-session "${session_id}" >/dev/null 2>&1; then
+    echo "DCV session '${session_id}' has ended."
+    exit 0
+  fi
+  sleep 5
+done
+
+wait "${stunnel_pid}"

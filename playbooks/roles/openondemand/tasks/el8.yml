@@ -400,7 +400,7 @@
         marker: "# {mark} ANSIBLE MANAGED BLOCK FOR OOD NODE ROUTING"
         insertafter: EOF
         block: |
-          host_regex: 'desktop-[\w-]+'
+          host_regex: '{{ ood_host_regex }}'
           node_uri: '/node'
           rnode_uri: '/rnode'
 
@@ -424,7 +424,7 @@
           script:
           {% if ood_vnc_use_gpu | default(false) | bool %}
             native:
-              - "--partition=desktop"
+              - "--partition={{ ood_vnc_queue }}"
               - "--gres=gpu:A10:1"
               - "--cpus-per-task={{ ood_vnc_cpus_per_task | default(8) }}"
           {% else %}
@@ -453,7 +453,7 @@
                 - "gnome"
             node_type: null
             bc_queue:
-              value: "desktop"
+              value: "{{ ood_vnc_queue }}"
     
           form:
             - bc_vnc_idle
