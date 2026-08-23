@@ -13,16 +13,6 @@
     append: true
   when: ood_vnc_use_gpu | default(false) | bool
 
-- name: Desktop | Install "Server with GUI" package group
-  vars:
-    package_name:
-      - "@Server with GUI"
-    package_state: present
-    package_exclude:
-      - "kernel*"
-  include_role:
-    name: safe_yum
-
 - name: Desktop | Remove tigervnc-server-minimal
   ansible.builtin.package:
     name: tigervnc-server-minimal
