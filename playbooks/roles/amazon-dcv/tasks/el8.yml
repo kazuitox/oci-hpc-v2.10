@@ -11,16 +11,6 @@
     groups: "{{ ood_dcv_vgl_group }}"
     append: true
 
-- name: Amazon DCV | Install "Server with GUI" package group
-  vars:
-    package_name:
-      - "@Server with GUI"
-    package_state: present
-    package_exclude:
-      - "kernel*"
-  ansible.builtin.include_role:
-    name: safe_yum
-
 - name: Amazon DCV | Install provisioning prerequisites
   ansible.builtin.dnf:
     name:

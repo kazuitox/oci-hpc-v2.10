@@ -47,11 +47,11 @@ variable "import_compute_image_from_object_storage" {
 }
 variable "compute_image_source_uri" {
   type    = string
-  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/G--enG8jrQxJhPnNs_O-gUqiHS2tU4IQ6cXqSRotr6-bXFhkfX7KCarOb_8q9g9D/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-image-v1.1"
+  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/4XVinpRRcwbTyHSSs8S8ENQsFbmgkz-QFDA7dpgI1UXz1dZvRlVvaw5KcNmYIVHC/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-compute-image-v1.2"
 }
 variable "compute_image_display_name" {
   type    = string
-  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-image-v1.1"
+  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-compute-image-v1.2"
 }
 variable "compute_image_operating_system" {
   type    = string
@@ -103,11 +103,11 @@ variable "ood_vnc_use_gpu" {
 }
 variable "ood_vnc_gpu_image_source_uri" {
   type    = string
-  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/_cGy_ZWuygSW2Y9pq3yGEBmduhqWvAKgTB54_euyd7Na_VHKidiUMZRBgstp8X18/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-vnc-a10-gpu-image-v1.0"
+  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/HvG-epKYsNduDr_0riuTB9oz1fypCUIYgjkxT0Lk6PtAu0V4WTHKSWWUzQZ-iI5q/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-desktop-a10-gpu-image-v1.1"
 }
 variable "ood_vnc_gpu_image_display_name" {
   type    = string
-  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-vnc-a10-gpu-image-v1.0"
+  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-desktop-a10-gpu-image-v1.1"
 }
 variable "ood_vnc_gpu_image_operating_system" {
   type    = string
