@@ -1,6 +1,6 @@
-# OCI HPC クラスター構築スタック
+# OCI HPC Trial Pack
 
-[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/kazuitox/oci-hpc-v2.10/archive/refs/heads/master.zip)
+[![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/kazuitox/oci-hpc-trial-pack/archive/refs/heads/master.zip)
 
 本リポジトリは、Oracle Cloud Infrastructure (OCI) 上に HPC 環境を短時間で構築し、PoC や初期検証をすばやく開始することを目的としています。
 この目的に合わせて、現時点では Oracle Linux 8 を対象 OS として動作確認しています。その他の OS やバージョンについては未検証のため、利用する場合は個別に検証してください。
@@ -8,6 +8,16 @@
 Terraform / Oracle Resource Manager スタックとして、コントローラ、計算ノード、Slurm、LDAP、共有ストレージ、Autoscaling、監視、Open OnDemand などをまとめて構成します。
 
 `schema.yaml` は日本語 UI 向けに整備されており、`SIMPLE` モードでは最小限の入力、`ADVANCED` モードでは詳細な構成項目を表示します。
+
+## バージョニング
+
+`oci-hpc-trial-pack` は `v1.0.0` から始まる独立したバージョン系列として管理します。最初のリリースは `oci-hpc v2.10.6.23` をベースとしており、既存の `v2.10.x` タグは旧系列の履歴として保持します。
+
+- 後方互換性のある不具合修正: パッチバージョン（例: `v1.0.1`）
+- 後方互換性のある機能追加: マイナーバージョン（例: `v1.1.0`）
+- 破壊的変更: メジャーバージョン（例: `v2.0.0`）
+
+変更履歴は [CHANGELOG.md](CHANGELOG.md) を参照してください。
 
 ## 主な構成
 

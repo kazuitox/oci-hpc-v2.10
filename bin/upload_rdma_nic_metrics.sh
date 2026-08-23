@@ -38,7 +38,7 @@ dis_help()
    echo
    echo "e.g.,  sh ./upload_rdma_nic_metrics.sh -l 24 -i 5 -c clusterName1"
    echo
-   echo "Supported releases: 2.10.3+"
+   echo "Supported releases: oci-hpc-trial-pack v1.0.0 or later"
    echo
 }
 
