@@ -1963,7 +1963,7 @@ variables:
     visible: ${add_nfs}
   mount_target_count:
     title: FSS Mount Target 数
-    description: File System で使用する FSS Mount Target の数
+    description: DNS エントリを使用する場合に File System で使用する FSS Mount Target の数。DNS エントリを使用しない場合は 1 に固定され、IP アドレスでマウントします
     type: integer
     default: 1
     required: true
@@ -1971,6 +1971,7 @@ variables:
       and:
       - ${add_nfs}
       - ${create_fss}
+      - ${dns_entries}
   fss_compartment:
     title: FSS コンパートメント
     description: FSS Mount Target と File System を追加するコンパートメント
