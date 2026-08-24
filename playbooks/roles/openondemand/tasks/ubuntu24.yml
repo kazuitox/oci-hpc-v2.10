@@ -448,6 +448,7 @@
             desktop:
               label: "Desktop Environment"
               widget: select
+              value: "xfce"
               options:
                 - "xfce"
                 - "gnome"
