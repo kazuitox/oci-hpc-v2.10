@@ -171,4 +171,5 @@ variable "percentage_of_cores_enabled" {
 }
 variable "timezone" { default = "${timezone}" }
 variable "use_ood" { default = "${use_ood}" }
-variable "ood_vnc_use_gpu" { default = ${ood_vnc_use_gpu} }
+variable "ood_dcv_enabled" { default = ${ood_dcv_enabled} }
+variable "ood_desktop_use_gpu" { default = ${ood_desktop_use_gpu} }

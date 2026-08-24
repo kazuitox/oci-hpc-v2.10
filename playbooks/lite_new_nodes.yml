@@ -167,7 +167,7 @@
         name: amazon-dcv
       when:
         - use_ood | default(false) | bool
-        - ood_vnc_use_gpu | default(false) | bool
+        - ood_dcv_enabled | default(false) | bool
         - queue | default('') == 'dcv'
 
 - hosts: compute, slurm_backup

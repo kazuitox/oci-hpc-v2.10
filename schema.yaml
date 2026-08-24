@@ -231,9 +231,11 @@ variableGroups:
     eq:
     - ${ui_mode}
     - ADVANCED
-- title: HPC Webポータル
+- title: HPC Webポータル(Open Ondemand)
   variables:
   - ${use_ood}
+  - ${ood_dcv_enabled}
+  - ${ood_desktop_use_gpu}
   - ${ood_vnc_use_gpu}
   - ${ood_source_cidr}
 - title: ソフトウェア
@@ -1761,14 +1763,45 @@ variables:
     title: Open OnDemand をインストール
     default: true
     description: Open OnDemand は、HPC resources へのセキュアなブラウザベースアクセスを提供する Web ベース platform です。ユーザーは直接 SSH access せずに application の実行、file 管理、job 投入を行えます。パーティションとインスタンスタイプ（Constraint）を選択できる Slurm ジョブ作成用の OpenComposer v2.0.2 もインストールします。
-  ood_vnc_use_gpu:
+  ood_dcv_enabled:
     type: boolean
-    title: Open OnDemand VNC / Amazon DCV に A10 GPU インスタンスを使用
+    title: Amazon DCV連携の有効化
     default: false
-    description: チェックするとVNC用のvnc partitionはVM.GPU.A10.1とGPUデスクトップ用Custom Imageを使用し、同じGPU構成のdcv partitionを追加します。Open OnDemandにはVNCとAmazon DCVの両方が表示され、それぞれ専用partitionへジョブを投入します。
+    description: >-
+      本機能は、Amazon DCVを使用したリモートデスクトップ接続の検証を目的としています。
+      本構成ではAmazon DCV Serverに別途ライセンスを設定しないため、インストール時に自動的に適用される自動評価ライセンスを使用します。
+      自動評価ライセンスはインストール後30日間有効で、有効期限後はAmazon DCVセッションを新規作成またはホストできません。
+      継続利用または本番利用には、利用者が適切なライセンスを用意し、Amazon DCVのライセンス条件およびEULAを確認・遵守する必要があります。
     visible:
       and:
       - ${use_ood}
+      - eq:
+        - ${cluster_os}
+        - Oracle Linux 8
+  ood_desktop_use_gpu:
+    type: boolean
+    title: デスクトップ利用でNVIDIA A10 GPUを有効化
+    default: false
+    description: >-
+      VNCと、Amazon DCV連携を有効化した場合のAmazon DCVのデスクトップノードにVM.GPU.A10.1と
+      GPUデスクトップ用Custom Imageを使用します。GPUインスタンスのサービス制限と利用料金が適用されます。
+    visible:
+      and:
+      - ${use_ood}
+      - eq:
+        - ${cluster_os}
+        - Oracle Linux 8
+  ood_vnc_use_gpu:
+    type: boolean
+    title: '旧設定: VNC / Amazon DCVでA10 GPUを使用'
+    default: false
+    description: >-
+      旧バージョンとの互換設定です。Onの間はAmazon DCV連携とA10 GPUデスクトップの両方が有効になります。
+      新しい2つのチェックボックスを個別に設定する場合は、このチェックを外してください。
+    visible:
+      and:
+      - ${use_ood}
+      - ${ood_vnc_use_gpu}
       - eq:
         - ${cluster_os}
         - Oracle Linux 8

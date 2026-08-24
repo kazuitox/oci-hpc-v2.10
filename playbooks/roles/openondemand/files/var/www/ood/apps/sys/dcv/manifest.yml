@@ -6,5 +6,9 @@ subcategory: Desktops
 role: batch_connect
 icon: fa://desktop
 description: |-
-  Slurm が割り当てた GPU 計算ノード上に Amazon DCV 仮想セッションを作成します。
+{% if ood_desktop_use_gpu | default(false) | bool %}
+  Slurm が割り当てた NVIDIA A10 GPU デスクトップノード上に Amazon DCV 仮想セッションを作成します。
+{% else %}
+  Slurm が割り当てた CPU デスクトップノード上に Amazon DCV 仮想セッションを作成します。
+{% endif %}
   ジョブを停止すると DCV セッションも削除されます。

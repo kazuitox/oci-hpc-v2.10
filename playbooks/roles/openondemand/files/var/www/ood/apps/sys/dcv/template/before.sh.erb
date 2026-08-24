@@ -4,7 +4,11 @@
 # values also make a manually forged form submission harmless.
 dcv_desktop="<%= %w[gnome].include?(context.desktop.to_s) ? context.desktop : 'gnome' %>"
 dcv_resolution="<%= %w[1280x720 1600x900 1920x1080].include?(context.dcv_resolution.to_s) ? context.dcv_resolution : '1920x1080' %>"
+{% if ood_desktop_use_gpu | default(false) | bool %}
 dcv_gl="<%= %w[on off].include?(context.dcv_gl.to_s) ? context.dcv_gl : 'on' %>"
+{% else %}
+dcv_gl="off"
+{% endif %}
 dcv_storage="<%= %w[home off].include?(context.dcv_storage.to_s) ? context.dcv_storage : 'home' %>"
 dcv_max_clients="<%= [[context.dcv_max_clients.to_i, 1].max, 4].min %>"
 dcv_eula_accept="<%= context.dcv_eula_accept.to_s == '1' ? '1' : '0' %>"

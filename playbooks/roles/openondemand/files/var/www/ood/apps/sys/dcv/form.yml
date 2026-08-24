@@ -21,6 +21,7 @@ attributes:
       - ["1920 x 1080", "1920x1080"]
     help: "接続後は DCV の表示メニューから自動調整または別の解像度へ変更できます。"
 
+{% if ood_desktop_use_gpu | default(false) | bool %}
   dcv_gl:
     label: "GPU-accelerated OpenGL"
     widget: select
@@ -29,6 +30,7 @@ attributes:
       - ["Enabled", "on"]
       - ["Disabled", "off"]
     help: "Enabled の場合は DCV-GL を使って A10 GPU を仮想セッションへ公開します。"
+{% endif %}
 
   dcv_max_clients:
     label: "Maximum concurrent clients"
@@ -66,16 +68,18 @@ attributes:
     help: |-
       **Amazon DCVについて**
 
-      Launchを実行すると、作成されるGPU計算ノードにAmazon DCV Serverが自動的にダウンロード・インストールされます。Amazon DCVはAmazon Web Servicesが提供する第三者ソフトウェアであり、Amazon DCV EULAが適用されます。
+      Launchを実行すると、作成されるデスクトップ計算ノードにAmazon DCV Serverが自動的にダウンロード・インストールされます。Amazon DCVはAmazon Web Servicesが提供するソフトウェアであり、Amazon DCV EULAが適用されます。
 
-      本構成では、Production License等が設定されていない場合、Amazon DCVのAutomatic Evaluation Licenseが使用されます。評価ライセンスはインストール後30日間有効で、短期のテスト・評価用途を対象としています。本番利用には適切なライセンスをご用意ください。
+      本機能は、Amazon DCVを使用したリモートデスクトップ接続の検証を目的としています。本構成ではAmazon DCV Serverに別途ライセンスを設定しないため、インストール時に自動的に適用される自動評価ライセンスを使用します。自動評価ライセンスはインストール後30日間有効で、有効期限後はAmazon DCVセッションを新規作成またはホストできません。継続利用または本番利用には、利用者が適切なライセンスを用意し、Amazon DCVのライセンス条件およびEULAを確認・遵守する必要があります。
 
   bc_queue: "dcv"
 
 form:
   - desktop
   - dcv_resolution
+{% if ood_desktop_use_gpu | default(false) | bool %}
   - dcv_gl
+{% endif %}
   - dcv_max_clients
   - dcv_storage
   - bc_num_hours
