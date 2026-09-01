@@ -13,6 +13,11 @@ execution=1
 playbooks_path=$folder/../playbooks/
 inventory_path=$folder/../autoscaling/clusters/$1
 
+if ! python3 "$folder/resize.py" --cluster_name "$1" --inventory "$inventory_path/inventory" prepare_local_block_volume; then
+  echo "Failed to prepare local Block Volume inventory for $1" >&2
+  exit 1
+fi
+
 
 username=`cat $inventory_path/inventory | grep compute_username= | tail -n 1| awk -F "=" '{print $2}'`
 if [ "$username" == "" ]

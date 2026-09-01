@@ -24,10 +24,18 @@
     dev: '{{ target["devicenodes"][0] }}'
     fstype: ext4
 
+- name: Read the iSCSI filesystem UUID
+  command: 'blkid -s UUID -o value {{ target["devicenodes"][0] }}'
+  register: iscsi_filesystem_uuid
+  changed_when: false
+  retries: 10
+  delay: 2
+  until: iscsi_filesystem_uuid.rc == 0 and iscsi_filesystem_uuid.stdout | length > 0
+
 - name: Mount local volume
   mount:
     path: "{{ local_path }}"
-    src: '{{ target["devicenodes"][0] }}'
+    src: 'UUID={{ iscsi_filesystem_uuid.stdout }}'
     fstype: ext4
     opts: defaults,noatime,_netdev
     state: mounted

@@ -230,9 +230,11 @@ resource "null_resource" "controller" {
   }
 }
 resource "null_resource" "cluster" { 
-  depends_on = [null_resource.controller, null_resource.backup, oci_core_compute_cluster.compute_cluster, oci_core_cluster_network.cluster_network, oci_core_instance.controller, oci_core_volume_attachment.controller_volume_attachment ] 
+  depends_on = [null_resource.controller, null_resource.backup, oci_core_compute_cluster.compute_cluster, oci_core_cluster_network.cluster_network, oci_core_instance.controller, oci_core_volume_attachment.controller_volume_attachment]
   triggers = { 
-    cluster_instances = join(", ", local.cluster_instances_names)
+    cluster_instances           = join(", ", local.cluster_instances_names)
+    cluster_instance_ids        = join(", ", local.cluster_instances_ids)
+    local_block_volume_settings = sha256(jsonencode([var.use_local_block_volume, var.local_block_volume_size, var.local_block_volume_performance, var.local_block_volume_mount_point]))
   } 
 
   provisioner "file" {
@@ -245,6 +247,7 @@ resource "null_resource" "cluster" {
       login_name = var.login_node ? oci_core_instance.login[0].display_name : "",
       login_ip = var.login_node ? oci_core_instance.login[0].private_ip: "",
       compute = var.node_count > 0 ? zipmap(local.cluster_instances_names, local.cluster_instances_ips) : zipmap([],[])
+      compute_instance_ids = var.node_count > 0 ? zipmap(local.cluster_instances_names, local.cluster_instances_ids) : zipmap([],[])
       public_subnet = data.oci_core_subnet.public_subnet.cidr_block, 
       private_subnet = data.oci_core_subnet.private_subnet.cidr_block, 
       rdma_network = cidrhost(var.rdma_subnet, 0),
@@ -259,6 +262,10 @@ resource "null_resource" "cluster" {
       cluster_nfs = var.use_cluster_nfs,
       cluster_nfs_path = var.cluster_nfs_path,
       scratch_nfs_path = var.scratch_nfs_path,
+      use_local_block_volume = var.use_local_block_volume,
+      local_block_volume_size = var.local_block_volume_size,
+      local_block_volume_performance = var.local_block_volume_performance,
+      local_block_volume_mount_point = var.local_block_volume_mount_point,
       add_nfs = var.add_nfs,
       nfs_target_path = var.nfs_target_path,
       nfs_source_IP = local.nfs_source_IP,
@@ -373,6 +380,10 @@ resource "null_resource" "cluster" {
       ood_dcv_enabled = local.ood_vnc_gpu_enabled,
       use_marketplace_image = local.effective_use_marketplace_image,
       boot_volume_size = var.boot_volume_size,
+      use_local_block_volume = var.use_local_block_volume,
+      local_block_volume_size = var.local_block_volume_size,
+      local_block_volume_performance = var.local_block_volume_performance,
+      local_block_volume_mount_point = var.local_block_volume_mount_point,
       shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape,
       region = var.region,
       ad = var.use_multiple_ads? join(" ", [var.ad, var.secondary_ad, var.third_ad]) : var.ad,

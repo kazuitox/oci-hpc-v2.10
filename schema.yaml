@@ -84,6 +84,10 @@ variableGroups:
   - ${node_count}
   - ${hyperthreading}
   - ${boot_volume_size}
+  - ${use_local_block_volume}
+  - ${local_block_volume_size}
+  - ${local_block_volume_performance}
+  - ${local_block_volume_mount_point}
   - ${use_compute_agent}
   - ${use_marketplace_image}
   - ${import_compute_image_from_object_storage}
@@ -1311,6 +1315,36 @@ variables:
     title: Boot Volume サイズ (GB)
     default: 100
     description: 各 Compute node の Boot Volume サイズ (GB)
+  use_local_block_volume:
+    type: boolean
+    title: 各 Compute node にローカル Block Volume を追加
+    default: false
+    description: 初期 Permanent node と生成される queues.conf の標準 Instance Type に、ノード専用の一時 Block Volume を追加します。
+  local_block_volume_size:
+    type: integer
+    required: true
+    minimum: 50
+    title: ローカル Block Volume サイズ (GB)
+    default: 1000
+    description: 各 Compute node に1台ずつ作成する Block Volume のサイズです。
+    visible: ${use_local_block_volume}
+  local_block_volume_performance:
+    type: enum
+    title: ローカル Block Volume パフォーマンス
+    required: true
+    enum:
+    - 0.  Lower performance
+    - 10. Balanced performance
+    - 20. High Performance
+    default: 10. Balanced performance
+    visible: ${use_local_block_volume}
+  local_block_volume_mount_point:
+    type: string
+    title: ローカル Block Volume マウントポイント
+    required: true
+    default: /scratch
+    description: 各 Compute node 内でのみ利用する200文字以内の絶対パスを指定します。共有 NFS や NVMe のマウントポイントとは重複できません。
+    visible: ${use_local_block_volume}
   use_marketplace_image:
     type: boolean
     title: Marketplace Image を使用

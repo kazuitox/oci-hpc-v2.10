@@ -178,12 +178,8 @@ forks=$(($threads * 8))
 
 if [ ! -d /etc/ansible ] ; then
   sudo mkdir /etc/ansible
-  if [ $ID == "ubuntu" ] ; then
-    sudo chown ubuntu:ubuntu /etc/ansible
-  else
-    sudo chown opc:opc /etc/ansible
-  fi
 fi
+sudo chown "$(id -u):$(id -g)" /etc/ansible
 
 ansible-config init --disabled -t all | sudo tee /etc/ansible/ansible.cfg > /dev/null
 sudo sed -i "s/^\(#\|;\)forks.*/forks = ${forks}/" /etc/ansible/ansible.cfg

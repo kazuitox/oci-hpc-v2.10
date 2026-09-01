@@ -36,6 +36,11 @@ if [[ $configure != true ]] ; then
         exit
 fi
 
+if ! python3 /opt/oci-hpc/bin/resize.py --inventory "$inventory" prepare_local_block_volume; then
+  echo "Failed to prepare local Block Volume inventory" >&2
+  exit 1
+fi
+
 
 username=`cat $inventory | grep compute_username= | tail -n 1| awk -F "=" '{print $2}'`
 if [ "$username" == "" ]

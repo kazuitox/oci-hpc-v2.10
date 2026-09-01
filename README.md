@@ -119,6 +119,12 @@ conf/queues.conf.example
 - `max_cluster_count`: 同時に保持できる最大クラスター数。
 - `cluster_network` / `compute_cluster`: 作成方式を指定します。
 - `ad`: 複数 AD を空白区切りで指定すると、作成失敗時に別 AD を試行します。
+- `use_local_block_volume`: 各 Compute node 専用の一時 Block Volume をアタッチします。
+- `local_block_volume_size`: ノードごとの Block Volume サイズ（50 GB 以上の整数）です。
+- `local_block_volume_performance`: `0.  Lower performance`、`10. Balanced performance`、`20. High Performance` のいずれかを指定します。
+- `local_block_volume_mount_point`: ノード内のマウントポイントを200文字以内の絶対パスで指定します。共有 NFS、NVMe、`/home` などの既存パスとは重複できません。
+
+このノード専用 Block Volume は `use_scratch_nfs` で構成するクラスター内共有 NFS とは独立しています。XFS（Oracle Linux）または ext4（Ubuntu/Debian）で初期化し、ノード終了時に自動削除します。稼働中ノードの設定は後から付け替えず、`queues.conf` の変更後に新規作成されるクラスター／ノードから適用されます。初期 Permanent node にはスタック作成時の同名設定が適用されます。
 
 設定を変更した後は、Slurm 設定を再生成します。
 
