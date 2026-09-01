@@ -238,7 +238,9 @@
   command: "mountpoint -q {{ local_block_volume_normalized_mount_point }}"
   register: local_block_volume_mountpoint_check
   changed_when: false
-  failed_when: local_block_volume_mountpoint_check.rc not in [0, 32]
+  # Depending on the Oracle Linux image, an existing path that is not a mount
+  # point returns either 1 or 32. Both mean that initialization should continue.
+  failed_when: local_block_volume_mountpoint_check.rc not in [0, 1, 32]
 
 - name: Check that an unmounted local Block Volume directory is empty
   command: "find {{ local_block_volume_normalized_mount_point }} -mindepth 1 -maxdepth 1 -print -quit"
