@@ -20,6 +20,8 @@ script:
     - "--partition=dcv"
     - "--nodes=1"
     - "--ntasks=1"
+{% if ood_desktop_use_gpu | default(false) | bool %}
     - "--gres=gpu:A10:1"
-    - "--cpus-per-task=8"
+{% endif %}
+    - "--cpus-per-task={{ ood_dcv_cpus_per_task }}"
     - "--job-name=ood-dcv"

@@ -47,7 +47,7 @@ resource "oci_core_image" "compute_node_gpgpu_custom_image" {
 }
 
 resource "oci_core_image" "ood_vnc_gpu_custom_image" {
-  count = var.ood_vnc_use_gpu && tobool(var.use_ood) ? 1 : 0
+  count = local.ood_desktop_gpu_enabled ? 1 : 0
 
   compartment_id = var.targetCompartment
   display_name   = var.ood_vnc_gpu_image_display_name

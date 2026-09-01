@@ -68,9 +68,9 @@
     - dcv/template
   when: ood_dcv_enabled | bool
 
-- name: OpenOnDemand dashboard | Install Amazon DCV app files
-  ansible.builtin.copy:
-    src: "var/www/ood/apps/sys/dcv/{{ item }}"
+- name: OpenOnDemand dashboard | Render Amazon DCV mode-specific app files
+  ansible.builtin.template:
+    src: "{{ role_path }}/files/var/www/ood/apps/sys/dcv/{{ item }}"
     dest: "/var/www/ood/apps/sys/dcv/{{ item }}"
     owner: root
     group: root
@@ -79,10 +79,31 @@
     - manifest.yml
     - form.yml
     - submit.yml.erb
+  when: ood_dcv_enabled | bool
+
+- name: OpenOnDemand dashboard | Install static Amazon DCV app files
+  ansible.builtin.copy:
+    src: "var/www/ood/apps/sys/dcv/{{ item }}"
+    dest: "/var/www/ood/apps/sys/dcv/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
     - view.html.erb
   when: ood_dcv_enabled | bool
 
-- name: OpenOnDemand dashboard | Install Amazon DCV job templates
+- name: OpenOnDemand dashboard | Render Amazon DCV mode-specific job templates
+  ansible.builtin.template:
+    src: "{{ role_path }}/files/var/www/ood/apps/sys/dcv/template/{{ item }}"
+    dest: "/var/www/ood/apps/sys/dcv/template/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - before.sh.erb
+  when: ood_dcv_enabled | bool
+
+- name: OpenOnDemand dashboard | Install static Amazon DCV job templates
   ansible.builtin.copy:
     src: "var/www/ood/apps/sys/dcv/template/{{ item }}"
     dest: "/var/www/ood/apps/sys/dcv/template/{{ item }}"
@@ -90,7 +111,6 @@
     group: root
     mode: "0755"
   loop:
-    - before.sh.erb
     - after.sh.erb
     - script.sh.erb
     - clean.sh.erb

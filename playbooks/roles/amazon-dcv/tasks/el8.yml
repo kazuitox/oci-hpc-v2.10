@@ -4,12 +4,33 @@
     name: "{{ ood_dcv_vgl_group }}"
     gid: "{{ ood_vnc_vgl_gid | default(9877) }}"
     state: present
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Add compute user to VirtualGL users group
   ansible.builtin.user:
     name: "{{ compute_username | default('opc') }}"
     groups: "{{ ood_dcv_vgl_group }}"
     append: true
+  when: ood_desktop_use_gpu | default(false) | bool
+
+- name: Amazon DCV | Install "Server with GUI" package group on CPU nodes
+  vars:
+    package_name:
+      - "@Server with GUI"
+    package_state: present
+    package_exclude:
+      - "kernel*"
+  ansible.builtin.include_role:
+    name: safe_yum
+  when: not (ood_desktop_use_gpu | default(false) | bool)
+
+- name: Amazon DCV | Select packages for the desktop acceleration mode
+  ansible.builtin.set_fact:
+    ood_dcv_effective_rpms: >-
+      {{ ood_dcv_common_rpms
+         + (ood_dcv_gpu_rpms
+            if (ood_desktop_use_gpu | default(false) | bool)
+            else []) }}
 
 - name: Amazon DCV | Install provisioning prerequisites
   ansible.builtin.dnf:
@@ -58,13 +79,13 @@
     src: "{{ ood_dcv_archive_path }}"
     dest: "{{ ood_dcv_cache_dir }}"
     remote_src: true
-    creates: "{{ ood_dcv_extract_dir }}/{{ ood_dcv_rpms[0].name }}"
+    creates: "{{ ood_dcv_extract_dir }}/{{ ood_dcv_effective_rpms[0].name }}"
 
 - name: Amazon DCV | Calculate RPM SHA-256 checksums
   ansible.builtin.stat:
     path: "{{ ood_dcv_extract_dir }}/{{ item.name }}"
     checksum_algorithm: sha256
-  loop: "{{ ood_dcv_rpms }}"
+  loop: "{{ ood_dcv_effective_rpms }}"
   loop_control:
     label: "{{ item.name }}"
   register: ood_dcv_rpm_stats
@@ -92,7 +113,7 @@
       - rpm
       - --checksig
       - "{{ ood_dcv_extract_dir }}/{{ item.name }}"
-  loop: "{{ ood_dcv_rpms }}"
+  loop: "{{ ood_dcv_effective_rpms }}"
   loop_control:
     label: "{{ item.name }}"
   register: ood_dcv_rpm_signatures
@@ -112,7 +133,7 @@
 - name: Amazon DCV | Install signed server packages
   ansible.builtin.dnf:
     name: >-
-      {{ ood_dcv_rpms
+      {{ ood_dcv_effective_rpms
          | map(attribute='name')
          | map('regex_replace', '^(.*)$', ood_dcv_extract_dir + '/\\1')
          | list }}
@@ -122,7 +143,7 @@
 - name: Amazon DCV | Inspect installed package payloads
   ansible.builtin.stat:
     path: "{{ item.verify_path }}"
-  loop: "{{ ood_dcv_rpms }}"
+  loop: "{{ ood_dcv_effective_rpms }}"
   loop_control:
     label: "{{ item.name }}"
   register: ood_dcv_payloads_initial
@@ -143,7 +164,7 @@
 - name: Amazon DCV | Verify installed package payloads
   ansible.builtin.stat:
     path: "{{ item.verify_path }}"
-  loop: "{{ ood_dcv_rpms }}"
+  loop: "{{ ood_dcv_effective_rpms }}"
   loop_control:
     label: "{{ item.name }}"
   register: ood_dcv_payloads
@@ -169,6 +190,7 @@
   ansible.builtin.systemd:
     name: dcvserver.service
     state: stopped
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Verify NVIDIA A10 is present
   ansible.builtin.command:
@@ -178,6 +200,7 @@
       - --format=csv,noheader
   register: ood_dcv_nvidia_gpu
   changed_when: false
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Validate NVIDIA GPU model
   ansible.builtin.assert:
@@ -187,6 +210,7 @@
       Amazon DCV expected {{ ood_dcv_expected_gpu }}, but nvidia-smi returned:
       {{ ood_dcv_nvidia_gpu.stdout | trim }}
     quiet: true
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Verify GDM account exists
   ansible.builtin.command:
@@ -195,6 +219,7 @@
       - passwd
       - gdm
   changed_when: false
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Verify VirtualGL access group exists
   ansible.builtin.command:
@@ -203,6 +228,7 @@
       - group
       - "{{ ood_dcv_vgl_group }}"
   changed_when: false
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Force GDM to use Xorg instead of Wayland
   ansible.builtin.lineinfile:
@@ -210,11 +236,13 @@
     regexp: '^\s*#?\s*WaylandEnable\s*='
     line: 'WaylandEnable=false'
     insertafter: '^\[daemon\]\s*$'
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Inspect NVIDIA Xorg configuration
   ansible.builtin.stat:
     path: /etc/X11/xorg.conf
   register: ood_dcv_xorg_config
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Require NVIDIA Xorg configuration
   ansible.builtin.assert:
@@ -225,6 +253,7 @@
       /etc/X11/xorg.conf is missing. Use the stack's A10 GPU desktop image
       or configure the NVIDIA X server before enabling Amazon DCV.
     quiet: true
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Configure NVIDIA Xorg for a headless GPU
   ansible.builtin.lineinfile:
@@ -232,11 +261,13 @@
     regexp: '^\s*Option\s+"UseDisplayDevice"\s+'
     line: '    Option         "UseDisplayDevice" "none"'
     insertafter: '^\s*Driver\s+"nvidia"\s*$'
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Stop GDM before reconfiguring DCV-GL
   ansible.builtin.systemd:
     name: gdm
     state: stopped
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Check whether X display zero is still in use
   ansible.builtin.command:
@@ -246,6 +277,7 @@
   register: ood_dcv_display_zero_users
   changed_when: false
   failed_when: ood_dcv_display_zero_users.rc not in [0, 1]
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Refuse to replace an active X display zero socket
   ansible.builtin.assert:
@@ -255,6 +287,7 @@
       X display :0 is still in use. Stop existing VNC/DCV sessions before
       provisioning the NVIDIA X server.
     quiet: true
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Remove stale X display zero files
   ansible.builtin.file:
@@ -263,12 +296,14 @@
   loop:
     - /tmp/.X11-unix/X0
     - /tmp/.X0-lock
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Allow GDM to access VirtualGL resources
   ansible.builtin.user:
     name: gdm
     groups: "{{ ood_dcv_vgl_group }}"
     append: true
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Disable DCV-GL before refreshing X access
   ansible.builtin.command:
@@ -276,6 +311,7 @@
       - /usr/sbin/dcvgladmin
       - disable
       - "64"
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Enable DCV-GL for the NVIDIA X server
   ansible.builtin.command:
@@ -283,6 +319,7 @@
       - /usr/sbin/dcvgladmin
       - enable
       - "64"
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Read the default systemd target
   ansible.builtin.command:
@@ -291,6 +328,7 @@
       - get-default
   register: ood_dcv_default_target
   changed_when: false
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Make graphical.target the default target
   ansible.builtin.command:
@@ -298,24 +336,29 @@
       - systemctl
       - set-default
       - graphical.target
-  when: ood_dcv_default_target.stdout | trim != 'graphical.target'
+  when:
+    - ood_desktop_use_gpu | default(false) | bool
+    - ood_dcv_default_target.stdout | trim != 'graphical.target'
 
 - name: Amazon DCV | Start graphical.target
   ansible.builtin.systemd:
     name: graphical.target
     state: started
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Enable and start GDM
   ansible.builtin.systemd:
     name: gdm
     enabled: true
     state: started
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Wait for physical X display zero
   ansible.builtin.wait_for:
     path: /tmp/.X11-unix/X0
     state: present
     timeout: 60
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Verify physical X display uses NVIDIA OpenGL
   ansible.builtin.shell:
@@ -335,6 +378,7 @@
   until: >-
     ood_dcv_glxinfo.rc == 0 and
     ood_dcv_glxinfo.stdout is search('OpenGL vendor string:\\s+NVIDIA')
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Run DCV-GL diagnostics
   ansible.builtin.command:
@@ -352,6 +396,7 @@
   until: >-
     ood_dcv_gl_diagnostics.rc in [0, 3] and
     'ERROR (' not in ood_dcv_gl_diagnostics.stdout
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Configure NVIDIA display section
   ansible.builtin.lineinfile:
@@ -359,6 +404,7 @@
     regexp: '^\[display/linux\]\s*$'
     line: '[display/linux]'
     insertafter: EOF
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Pin DCV-GL to physical NVIDIA display
   ansible.builtin.lineinfile:
@@ -366,6 +412,7 @@
     regexp: '^\s*#?\s*gl-displays\s*='
     line: "gl-displays = [':0.0']"
     insertafter: '^\[display/linux\]\s*$'
+  when: ood_desktop_use_gpu | default(false) | bool
 
 - name: Amazon DCV | Configure one-time token authentication
   ansible.builtin.lineinfile:

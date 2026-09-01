@@ -141,6 +141,16 @@ variable "rdma_subnet" { default = "10.224.0.0/12" }
 variable "private_subnet" { default = "172.16.4.0/22" }
 variable "ssh_cidr" { default = "0.0.0.0/0" }
 variable "ood_source_cidr" { default = "" }
+variable "ood_dcv_enabled" {
+  type    = bool
+  default = false
+}
+variable "ood_desktop_use_gpu" {
+  type    = bool
+  default = false
+}
+# Deprecated compatibility input. A legacy true value enables both of the
+# replacement options so existing Resource Manager stacks keep their behavior.
 variable "ood_vnc_use_gpu" {
   type    = bool
   default = false

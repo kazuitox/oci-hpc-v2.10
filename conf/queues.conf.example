@@ -63,7 +63,7 @@
         - name: dskv
           default: true
           shape: VM.GPU.A10.1
-          instance_keyword: gpu-v
+          instance_keyword: desktop-v
           permanent: false
           cluster_network: false
           compute_cluster: false
@@ -95,7 +95,7 @@
         - name: dskd
           default: true
           shape: VM.GPU.A10.1
-          instance_keyword: gpu-d
+          instance_keyword: desktop-d
           permanent: false
           cluster_network: false
           compute_cluster: false

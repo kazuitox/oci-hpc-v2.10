@@ -1,5 +1,6 @@
 ---
-ood_dcv_enabled: "{{ ood_vnc_use_gpu | default(false) | bool }}"
+ood_dcv_enabled: false
+ood_desktop_use_gpu: false
 ood_dcv_queue: dcv
 ood_dcv_expected_gpu: NVIDIA A10
 
@@ -17,7 +18,7 @@ ood_dcv_extract_dir: "{{ ood_dcv_cache_dir }}/nice-dcv-{{ ood_dcv_version }}-el8
 ood_dcv_gpg_key_path: "{{ ood_dcv_cache_dir }}/NICE-GPG-KEY"
 ood_dcv_vgl_group: "{{ ood_vnc_vgl_group | default('vglusers') }}"
 
-ood_dcv_rpms:
+ood_dcv_common_rpms:
   - name: nice-dcv-server-2025.0.20103-1.el8.x86_64.rpm
     sha256: 7fee5b826a1326b3541960e489ed9f0bb028ca54cc5bd63b1617e920f7931cf8
     verify_path: /usr/lib/systemd/system/dcvserver.service
@@ -27,9 +28,11 @@ ood_dcv_rpms:
   - name: nice-xdcv-2025.0.688-1.el8.x86_64.rpm
     sha256: bade2233d79217c2868f0117c48c88a106e1b12d0e7cd63843f8b1a48cae5fd4
     verify_path: /usr/bin/Xdcv
-  - name: nice-dcv-gl-2025.0.1112-1.el8.x86_64.rpm
-    sha256: 80bfed40233a06aac0cb4b99ccfcfeff800c71c62ad6a39a2bd70896c38fed3b
-    verify_path: /usr/sbin/dcvgladmin
   - name: nice-dcv-simple-external-authenticator-2025.0.282-1.el8.x86_64.rpm
     sha256: 232a7ac59c19573ce31f6b4c323ed2c30352b0c424f73e442e71cf159daebfad
     verify_path: /usr/lib/systemd/system/dcvsimpleextauth.service
+
+ood_dcv_gpu_rpms:
+  - name: nice-dcv-gl-2025.0.1112-1.el8.x86_64.rpm
+    sha256: 80bfed40233d06aac0cb4b99ccfcfeff800c71c62ad6a39a2bd70896c38fed3b
+    verify_path: /usr/sbin/dcvgladmin

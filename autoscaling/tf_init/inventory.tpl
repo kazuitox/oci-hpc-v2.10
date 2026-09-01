@@ -90,4 +90,5 @@ healthchecks=${healthchecks}
 timezone=${timezone}
 tags=${tags}
 use_ood=${use_ood}
-ood_vnc_use_gpu=${ood_vnc_use_gpu}
+ood_dcv_enabled=${ood_dcv_enabled}
+ood_desktop_use_gpu=${ood_desktop_use_gpu}
