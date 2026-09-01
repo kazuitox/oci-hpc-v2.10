@@ -3,7 +3,6 @@
   set_fact:
     local_block_volume_normalized_mount_point: "{{ local_block_volume_mount_point | regex_replace('/+$', '') }}"
     local_block_volume_filesystem: "{{ 'xfs' if ansible_os_family == 'RedHat' else 'ext4' }}"
-    local_block_volume_packages: "{{ ['iscsi-initiator-utils', 'xfsprogs'] if ansible_os_family == 'RedHat' else ['open-iscsi', 'e2fsprogs'] }}"
     local_block_volume_login_service: "{{ 'iscsi' if ansible_os_family == 'RedHat' else 'open-iscsi' }}"
     local_block_volume_reserved_mount_points:
       - "{{ nvme_path | default('/mnt/localdisk') | regex_replace('/+$', '') }}"
@@ -56,10 +55,13 @@
   loop: "{{ local_block_volume_reserved_mount_points }}"
   when: item | length > 1
 
-- name: Install local Block Volume client tools
+- name: Install local Block Volume client tools on Debian
   package:
-    name: "{{ local_block_volume_packages }}"
+    name:
+      - open-iscsi
+      - e2fsprogs
     state: present
+  when: ansible_os_family == 'Debian'
 
 - name: Enable the iSCSI initiator service
   service:
