@@ -47,11 +47,11 @@ variable "import_compute_image_from_object_storage" {
 }
 variable "compute_image_source_uri" {
   type    = string
-  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/4XVinpRRcwbTyHSSs8S8ENQsFbmgkz-QFDA7dpgI1UXz1dZvRlVvaw5KcNmYIVHC/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-compute-image-v1.2"
+  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/AqQaLtfNavruHeb0f0DEDzhIG1WONrMWHAxAYtyDROmT-Z7mx8xxebIwJedxTeSh/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-compute-image-v1.3"
 }
 variable "compute_image_display_name" {
   type    = string
-  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-compute-image-v1.2"
+  default = "Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-compute-image-v1.3"
 }
 variable "compute_image_operating_system" {
   type    = string
@@ -103,7 +103,7 @@ variable "ood_vnc_use_gpu" {
 }
 variable "ood_vnc_gpu_image_source_uri" {
   type    = string
-  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/HvG-epKYsNduDr_0riuTB9oz1fypCUIYgjkxT0Lk6PtAu0V4WTHKSWWUzQZ-iI5q/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-desktop-a10-gpu-image-v1.1"
+  default = "https://objectstorage.ap-tokyo-1.oraclecloud.com/p/K_A2HDuIuc8xg4S4ohXVphTjyXaz0u6kM3vjNK74usC8ZiybZPxzBhxpvbxrPi_I/n/idqcucnenh88/b/kazuito-bucket/o/Oracle-Linux-8.10-2025.07.21-0-OCA-RHCK-OFED-24.10-3.2.5.0-2025.08.21-0_oci-hpc-v2.10-desktop-a10-gpu-image-v1.1"
 }
 variable "ood_vnc_gpu_image_display_name" {
   type    = string
