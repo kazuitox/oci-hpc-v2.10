@@ -16,7 +16,7 @@ resource "local_file" "hosts" {
   }
 
 resource "local_file" "inventory" {
-  depends_on          = [oci_core_cluster_network.cluster_network, oci_core_cluster_network.cluster_network]
+  depends_on     = [oci_core_cluster_network.cluster_network]
   content        = templatefile("${local.controller_path}/inventory.tpl", {  
     controller_name = var.controller_name,
     controller_ip = var.controller_ip, 
@@ -25,6 +25,7 @@ resource "local_file" "inventory" {
     login_name = var.login_name,
     login_ip = var.login_ip,
     compute = var.node_count > 0 ? zipmap(local.cluster_instances_names, local.cluster_instances_ips) : zipmap([],[])
+    compute_instance_ids = var.node_count > 0 ? zipmap(local.cluster_instances_names, local.cluster_instances_ids) : zipmap([],[])
     public_subnet = var.public_subnet, 
     private_subnet = var.private_subnet, 
     rdma_network = cidrhost(var.rdma_subnet, 0),
@@ -49,6 +50,10 @@ resource "local_file" "inventory" {
     redundancy = var.redundancy,
     cluster_nfs_path = var.cluster_nfs_path,
     scratch_nfs_path = var.scratch_nfs_path,
+    use_local_block_volume = var.use_local_block_volume,
+    local_block_volume_size = var.local_block_volume_size,
+    local_block_volume_performance = var.local_block_volume_performance,
+    local_block_volume_mount_point = var.local_block_volume_mount_point,
     cluster_network = var.cluster_network,
     slurm = var.slurm,
     pyxis = var.pyxis,

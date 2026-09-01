@@ -7,7 +7,7 @@ ${controller_name} ansible_host=${controller_ip} ansible_user=${controller_usern
 [compute_to_add]
 [compute_configured]
 %{ for host, ip in compute ~}
-${host} ansible_host=${ip} ansible_user=${compute_username} role=compute
+${host} ansible_host=${ip} ansible_user=${compute_username} role=compute oci_instance_id=${compute_instance_ids[host]} use_local_block_volume=false
 %{ endfor ~}
 [compute_to_destroy]
 [nfs]
@@ -31,6 +31,10 @@ cluster_nfs = ${cluster_nfs}
 cluster_nfs_path = ${cluster_nfs_path}
 slurm_nfs_path = ${slurm_nfs_path}
 scratch_nfs_path = ${scratch_nfs_path}
+use_local_block_volume = ${use_local_block_volume}
+local_block_volume_size = ${local_block_volume_size}
+local_block_volume_performance = ${local_block_volume_performance}
+local_block_volume_mount_point = ${local_block_volume_mount_point}
 cluster_network = ${cluster_network}
 slurm = ${slurm}
 rack_aware = ${rack_aware}

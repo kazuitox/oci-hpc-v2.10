@@ -49,6 +49,10 @@ hyperthreading=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.
 region=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .region " $queues_conf`
 private_subnet=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .private_subnet " $queues_conf`
 private_subnet_id=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .private_subnet_id " $queues_conf`
+use_local_block_volume=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .use_local_block_volume // false" $queues_conf`
+local_block_volume_size=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .local_block_volume_size // 1000" $queues_conf`
+local_block_volume_performance=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .local_block_volume_performance // \"10. Balanced performance\"" $queues_conf`
+local_block_volume_mount_point=`yq eval ".queues.[] | select(.name == \"$4\") | .instance_types.[] | select(.name == \"$3\") | .local_block_volume_mount_point // \"/scratch\"" $queues_conf`
 
 cli_tags=""
 if [ $debug -eq 1 ]; then
@@ -76,6 +80,8 @@ fi
 
 # sed 安全化
 esc_tags="$(printf '%s' "$tags" | sed -e 's/[~&]/\\&/g')"
+esc_local_block_volume_performance="$(printf '%s' "$local_block_volume_performance" | sed -e 's/[~&]/\\&/g')"
+esc_local_block_volume_mount_point="$(printf '%s' "$local_block_volume_mount_point" | sed -e 's/[~&]/\\&/g')"
 
 if [ "$shape" == "" ]
 then
@@ -85,6 +91,54 @@ then
   exit
 fi
 
+if [[ "$use_local_block_volume" != "true" && "$use_local_block_volume" != "false" ]]
+then
+  echo "use_local_block_volume must be true or false for instance type $3 in queue $4"
+  rm -rf "$autoscaling_folder/clusters/$2"
+  exit 1
+fi
+
+if ! [[ "$local_block_volume_size" =~ ^[0-9]+$ ]] || [ "$local_block_volume_size" -lt 50 ]
+then
+  echo "local_block_volume_size must be an integer of at least 50 GB for instance type $3 in queue $4"
+  rm -rf "$autoscaling_folder/clusters/$2"
+  exit 1
+fi
+
+case "$local_block_volume_performance" in
+  "0.  Lower performance"|"10. Balanced performance"|"20. High Performance") ;;
+  *)
+    echo "local_block_volume_performance has an unsupported value for instance type $3 in queue $4"
+    rm -rf "$autoscaling_folder/clusters/$2"
+    exit 1
+    ;;
+esac
+
+if ! [[ "$local_block_volume_mount_point" =~ ^/[A-Za-z0-9._/-]+$ ]] || [ "$local_block_volume_mount_point" = "/" ] || [[ "$local_block_volume_mount_point" == *"//"* ]] || [[ "$local_block_volume_mount_point" =~ (^|/)\.\.?($|/) ]]
+then
+  echo "local_block_volume_mount_point must be a canonical absolute path other than / for instance type $3 in queue $4"
+  rm -rf "$autoscaling_folder/clusters/$2"
+  exit 1
+fi
+
+if [ "${#local_block_volume_mount_point}" -gt 200 ]
+then
+  echo "local_block_volume_mount_point must be at most 200 characters for instance type $3 in queue $4"
+  rm -rf "$autoscaling_folder/clusters/$2"
+  exit 1
+fi
+
+normalized_local_block_volume_mount_point="${local_block_volume_mount_point%/}"
+for reserved_local_block_volume_path in /mnt/localdisk /nfs/scratch /nfs/cluster /mnt/localdisk/nfs /home /share
+do
+  if [ "$normalized_local_block_volume_mount_point" = "$reserved_local_block_volume_path" ] || [[ "$normalized_local_block_volume_mount_point" == "$reserved_local_block_volume_path/"* ]] || [[ "$reserved_local_block_volume_path" == "$normalized_local_block_volume_mount_point/"* ]]
+  then
+    echo "local_block_volume_mount_point conflicts with reserved path $reserved_local_block_volume_path for instance type $3 in queue $4"
+    rm -rf "$autoscaling_folder/clusters/$2"
+    exit 1
+  fi
+done
+
 for ADName in $ADNames
 do
 
@@ -92,7 +146,7 @@ do
   echo $3 $4 > cluster_options
 
   # variables.tf へ置換（##TAGS## は esc_tags を使用）
-  sed "s~##NODES##~$1~g;s~##NAME##~$2~g;s~##SHAPE##~$shape~g;s~##CN##~$cluster_network~g;s~##QUEUE##~${4}~g;s~##COMP##~${targetCompartment}~g;s~##AD##~${ADName}~g;s~##BOOT##~${boot_volume_size}~g;s~##USEMP##~${use_marketplace_image}~g;s~##IMAGE##~${image}~g;s~##OCPU##~${instance_pool_ocpus}~g;s~##MEM##~${instance_pool_memory}~g;s~##CUSTOM_MEM##~${instance_pool_custom_memory}~g;s~##MP_LIST##~${marketplace_listing}~g;s~##HT##~${hyperthreading}~g;s~##INST_TYPE##~$3~g;s~##TAGS##~${esc_tags}~g;s~##REGION##~${region}~g;s~##PRIVATE_SUBNET_ID##~${private_subnet_id}~g;s~##PRIVATE_SUBNET##~${private_subnet}~g;s~##CC##~$compute_cluster~g" $conf_folder/variables.tf > variables.tf
+  sed "s~##NODES##~$1~g;s~##NAME##~$2~g;s~##SHAPE##~$shape~g;s~##CN##~$cluster_network~g;s~##QUEUE##~${4}~g;s~##COMP##~${targetCompartment}~g;s~##AD##~${ADName}~g;s~##BOOT##~${boot_volume_size}~g;s~##USE_LOCAL_BLOCK_VOLUME##~${use_local_block_volume}~g;s~##LOCAL_BLOCK_VOLUME_SIZE##~${local_block_volume_size}~g;s~##LOCAL_BLOCK_VOLUME_PERFORMANCE##~${esc_local_block_volume_performance}~g;s~##LOCAL_BLOCK_VOLUME_MOUNT_POINT##~${esc_local_block_volume_mount_point}~g;s~##USEMP##~${use_marketplace_image}~g;s~##IMAGE##~${image}~g;s~##OCPU##~${instance_pool_ocpus}~g;s~##MEM##~${instance_pool_memory}~g;s~##CUSTOM_MEM##~${instance_pool_custom_memory}~g;s~##MP_LIST##~${marketplace_listing}~g;s~##HT##~${hyperthreading}~g;s~##INST_TYPE##~$3~g;s~##TAGS##~${esc_tags}~g;s~##REGION##~${region}~g;s~##PRIVATE_SUBNET_ID##~${private_subnet_id}~g;s~##PRIVATE_SUBNET##~${private_subnet}~g;s~##CC##~$compute_cluster~g" $conf_folder/variables.tf > variables.tf
 
   echo "Started to build $2"
   start=`date -u +%s`

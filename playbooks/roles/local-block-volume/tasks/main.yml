@@ -1,0 +1,351 @@
+---
+- name: Normalize local Block Volume settings
+  set_fact:
+    local_block_volume_normalized_mount_point: "{{ local_block_volume_mount_point | regex_replace('/+$', '') }}"
+    local_block_volume_filesystem: "{{ 'xfs' if ansible_os_family == 'RedHat' else 'ext4' }}"
+    local_block_volume_login_service: "{{ 'iscsi' if ansible_os_family == 'RedHat' else 'open-iscsi' }}"
+    local_block_volume_reserved_mount_points:
+      - "{{ nvme_path | default('/mnt/localdisk') | regex_replace('/+$', '') }}"
+      - "{{ scratch_nfs_path | default('/nfs/scratch') | regex_replace('/+$', '') }}"
+      - "{{ cluster_nfs_path | default('/nfs/cluster') | regex_replace('/+$', '') }}"
+      - /mnt/localdisk/nfs
+      - /home
+      - "{{ nfs_target_path | default('/share') | regex_replace('/+$', '') }}"
+
+- name: Validate local Block Volume settings
+  assert:
+    that:
+      - local_block_volume_size | int >= 50
+      - local_block_volume_device_wait_timeout | int >= 1
+      - ansible_os_family in ['RedHat', 'Debian']
+      - local_block_volume_iscsi_ip is defined
+      - local_block_volume_iscsi_port is defined
+      - local_block_volume_iscsi_port | int > 0
+      - local_block_volume_iqn is defined
+      - local_block_volume_normalized_mount_point | length > 1
+      - local_block_volume_normalized_mount_point is match('^/[A-Za-z0-9._/-]+$')
+      - "'//' not in local_block_volume_normalized_mount_point"
+      - "'.' not in local_block_volume_normalized_mount_point.split('/')"
+      - "'..' not in local_block_volume_normalized_mount_point.split('/')"
+    fail_msg: Invalid local Block Volume size or mount point.
+
+- name: Resolve the local Block Volume mount point
+  command:
+    argv:
+      - realpath
+      - -m
+      - --
+      - "{{ local_block_volume_normalized_mount_point }}"
+  register: local_block_volume_real_mount_point
+  changed_when: false
+
+- name: Reject non-canonical or symlinked local Block Volume paths
+  assert:
+    that:
+      - local_block_volume_real_mount_point.stdout == local_block_volume_normalized_mount_point
+    fail_msg: "{{ local_block_volume_mount_point }} must be a canonical path without symbolic-link parents."
+
+- name: Reject local Block Volume mount point conflicts
+  assert:
+    that:
+      - local_block_volume_normalized_mount_point != item
+      - not local_block_volume_normalized_mount_point.startswith(item + '/')
+      - not item.startswith(local_block_volume_normalized_mount_point + '/')
+    fail_msg: "Local Block Volume mount point {{ local_block_volume_normalized_mount_point }} conflicts with reserved path {{ item }}."
+  loop: "{{ local_block_volume_reserved_mount_points }}"
+  when: item | length > 1
+
+- name: Install local Block Volume client tools on Debian
+  package:
+    name:
+      - open-iscsi
+      - e2fsprogs
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Enable the iSCSI initiator service
+  service:
+    name: iscsid
+    enabled: true
+    state: started
+
+- name: Read cached local Block Volume iSCSI targets
+  community.general.open_iscsi:
+    show_nodes: true
+    portal: "{{ local_block_volume_iscsi_ip }}"
+    port: "{{ local_block_volume_iscsi_port | string }}"
+  register: local_block_volume_cached_iscsi_targets
+
+- name: Discover the local Block Volume iSCSI target when needed
+  community.general.open_iscsi:
+    show_nodes: true
+    discover: true
+    portal: "{{ local_block_volume_iscsi_ip }}"
+    port: "{{ local_block_volume_iscsi_port | string }}"
+  when: local_block_volume_iqn not in (local_block_volume_cached_iscsi_targets.nodes | default([]))
+
+- name: Connect to the local Block Volume iSCSI target
+  community.general.open_iscsi:
+    login: true
+    portal: "{{ local_block_volume_iscsi_ip }}"
+    port: "{{ local_block_volume_iscsi_port | string }}"
+    target: "{{ local_block_volume_iqn }}"
+    auto_portal_startup: true
+  register: local_block_volume_iscsi_login
+  retries: "{{ ((local_block_volume_device_wait_timeout | int) / 2) | round(0, 'ceil') | int }}"
+  delay: 2
+  until: local_block_volume_iscsi_login.devicenodes is defined and (local_block_volume_iscsi_login.devicenodes | length == 1)
+
+- name: Enable the iSCSI automatic login service
+  service:
+    name: "{{ local_block_volume_login_service }}"
+    enabled: true
+    state: started
+
+- name: Wait for the local Block Volume device
+  wait_for:
+    path: "{{ local_block_volume_device }}"
+    state: present
+    timeout: "{{ local_block_volume_device_wait_timeout }}"
+
+- name: Inspect the local Block Volume device
+  stat:
+    path: "{{ local_block_volume_device }}"
+    follow: true
+  register: local_block_volume_device_stat
+
+- name: Require a block device for local scratch
+  assert:
+    that:
+      - local_block_volume_device_stat.stat.exists
+      - local_block_volume_device_stat.stat.isblk | default(false)
+    fail_msg: "{{ local_block_volume_device }} is not a block device."
+
+- name: Resolve the device returned by the requested iSCSI target
+  command:
+    argv:
+      - readlink
+      - -f
+      - --
+      - "{{ local_block_volume_iscsi_login.devicenodes[0] }}"
+  register: local_block_volume_login_device
+  changed_when: false
+
+- name: Resolve the configured consistent device path
+  command:
+    argv:
+      - readlink
+      - -f
+      - --
+      - "{{ local_block_volume_device }}"
+  register: local_block_volume_consistent_device
+  changed_when: false
+
+- name: Require the requested iSCSI target at the configured device path
+  assert:
+    that:
+      - local_block_volume_login_device.stdout | length > 0
+      - local_block_volume_login_device.stdout == local_block_volume_consistent_device.stdout
+    fail_msg: "{{ local_block_volume_device }} does not resolve to the requested local Block Volume IQN."
+
+- name: Check local Block Volume layout
+  command: "lsblk -nr -o TYPE {{ local_block_volume_device }}"
+  register: local_block_volume_layout
+  changed_when: false
+
+- name: Reject partitioned or LVM local Block Volumes
+  assert:
+    that:
+      - local_block_volume_layout.stdout_lines == ['disk']
+    fail_msg: "{{ local_block_volume_device }} already contains partitions or another storage layout."
+
+- name: Read an existing local Block Volume UUID before applying new settings
+  command: "blkid -s UUID -o value {{ local_block_volume_device }}"
+  register: local_block_volume_previous_uuid
+  changed_when: false
+  failed_when: local_block_volume_previous_uuid.rc not in [0, 2]
+
+- name: Find active paths for an existing local Block Volume
+  command: "findmnt -rn -o TARGET -S UUID={{ local_block_volume_previous_uuid.stdout }}"
+  register: local_block_volume_previous_active_targets
+  changed_when: false
+  failed_when: local_block_volume_previous_active_targets.rc not in [0, 1]
+  when: local_block_volume_previous_uuid.stdout | length > 0
+
+- name: Find persistent paths for an existing local Block Volume
+  command: "findmnt --fstab -rn -o TARGET -S UUID={{ local_block_volume_previous_uuid.stdout }}"
+  register: local_block_volume_previous_persistent_targets
+  changed_when: false
+  failed_when: local_block_volume_previous_persistent_targets.rc not in [0, 1]
+  when: local_block_volume_previous_uuid.stdout | length > 0
+
+- name: Collect paths already configured for the local Block Volume
+  set_fact:
+    local_block_volume_previous_targets: "{{ ((local_block_volume_previous_active_targets.stdout_lines | default([])) + (local_block_volume_previous_persistent_targets.stdout_lines | default([]))) | unique | list }}"
+
+- name: Detect an existing local Block Volume configuration
+  set_fact:
+    local_block_volume_existing_at_requested_path: "{{ local_block_volume_normalized_mount_point in local_block_volume_previous_targets }}"
+    local_block_volume_existing_at_another_path: "{{ (local_block_volume_previous_targets | difference([local_block_volume_normalized_mount_point])) | length > 0 }}"
+
+- name: Keep a running node's existing local Block Volume mount point
+  debug:
+    msg: "The local Block Volume is already configured at {{ local_block_volume_previous_targets | join(', ') }}; leaving the running node unchanged instead of applying {{ local_block_volume_normalized_mount_point }}."
+  when: local_block_volume_existing_at_another_path | bool
+
+- name: Stop changing this running node's existing local Block Volume
+  meta: end_host
+  when: local_block_volume_existing_at_another_path | bool
+
+- name: Read local Block Volume size
+  command: "blockdev --getsize64 {{ local_block_volume_device }}"
+  register: local_block_volume_size_bytes
+  changed_when: false
+
+- name: Validate local Block Volume size
+  assert:
+    that:
+      - local_block_volume_size_bytes.stdout | int == (local_block_volume_size | int * 1024 * 1024 * 1024)
+    fail_msg: "{{ local_block_volume_device }} does not match the configured local_block_volume_size."
+  when: not local_block_volume_existing_at_requested_path | bool
+
+- name: Read the local Block Volume device identifier
+  command: "lsblk -dnr -o MAJ:MIN {{ local_block_volume_device }}"
+  register: local_block_volume_device_major_minor
+  changed_when: false
+
+- name: Inspect the local Block Volume mount point
+  stat:
+    path: "{{ local_block_volume_normalized_mount_point }}"
+    follow: false
+  register: local_block_volume_mount_point_stat
+
+- name: Reject an unsafe existing mount point
+  assert:
+    that:
+      - not (local_block_volume_mount_point_stat.stat.islnk | default(false))
+      - not (local_block_volume_mount_point_stat.stat.exists | default(false)) or (local_block_volume_mount_point_stat.stat.isdir | default(false))
+    fail_msg: "{{ local_block_volume_normalized_mount_point }} must be a directory and must not be a symbolic link."
+
+- name: Create the local Block Volume mount point
+  file:
+    path: "{{ local_block_volume_normalized_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: not (local_block_volume_mount_point_stat.stat.exists | default(false))
+
+- name: Check whether the local Block Volume mount point is mounted
+  command: "mountpoint -q {{ local_block_volume_normalized_mount_point }}"
+  register: local_block_volume_mountpoint_check
+  changed_when: false
+  # Depending on the Oracle Linux image, an existing path that is not a mount
+  # point returns either 1 or 32. Both mean that initialization should continue.
+  failed_when: local_block_volume_mountpoint_check.rc not in [0, 1, 32]
+
+- name: Check that an unmounted local Block Volume directory is empty
+  command: "find {{ local_block_volume_normalized_mount_point }} -mindepth 1 -maxdepth 1 -print -quit"
+  register: local_block_volume_mount_point_contents
+  changed_when: false
+  when: local_block_volume_mountpoint_check.rc != 0
+
+- name: Reject a non-empty unmounted local Block Volume directory
+  assert:
+    that:
+      - local_block_volume_mount_point_contents.stdout == ''
+    fail_msg: "{{ local_block_volume_normalized_mount_point }} contains data and is not mounted."
+  when: local_block_volume_mountpoint_check.rc != 0
+
+- name: Read the device identifier mounted at the configured path
+  command: "findmnt -rn -o MAJ:MIN -M {{ local_block_volume_normalized_mount_point }}"
+  register: local_block_volume_mounted_major_minor
+  changed_when: false
+  when: local_block_volume_mountpoint_check.rc == 0
+
+- name: Reject a mount point used by another block device
+  assert:
+    that:
+      - local_block_volume_mounted_major_minor.stdout | trim == local_block_volume_device_major_minor.stdout | trim
+    fail_msg: "{{ local_block_volume_normalized_mount_point }} is mounted from another block device."
+  when: local_block_volume_mountpoint_check.rc == 0
+
+- name: Read an existing local Block Volume filesystem type
+  command: "blkid -s TYPE -o value {{ local_block_volume_device }}"
+  register: local_block_volume_existing_filesystem
+  changed_when: false
+  failed_when: local_block_volume_existing_filesystem.rc not in [0, 2]
+
+- name: Reject an unexpected local Block Volume filesystem
+  assert:
+    that:
+      - local_block_volume_existing_filesystem.stdout in ['', local_block_volume_filesystem]
+    fail_msg: "{{ local_block_volume_device }} contains an unexpected filesystem."
+
+- name: Create the local Block Volume filesystem
+  community.general.filesystem:
+    dev: "{{ local_block_volume_device }}"
+    fstype: "{{ local_block_volume_filesystem }}"
+  when: local_block_volume_existing_filesystem.stdout == ''
+
+- name: Read the local Block Volume filesystem UUID
+  command: "blkid -s UUID -o value {{ local_block_volume_device }}"
+  register: local_block_volume_uuid
+  changed_when: false
+  retries: 10
+  delay: 2
+  until: local_block_volume_uuid.rc == 0 and local_block_volume_uuid.stdout | length > 0
+
+- name: Find active mount points for the local Block Volume UUID
+  command: "findmnt -rn -o TARGET -S UUID={{ local_block_volume_uuid.stdout }}"
+  register: local_block_volume_active_targets
+  changed_when: false
+  failed_when: local_block_volume_active_targets.rc not in [0, 1]
+
+- name: Find persistent mount points for the local Block Volume UUID
+  command: "findmnt --fstab -rn -o TARGET -S UUID={{ local_block_volume_uuid.stdout }}"
+  register: local_block_volume_persistent_targets
+  changed_when: false
+  failed_when: local_block_volume_persistent_targets.rc not in [0, 1]
+
+- name: Reject local Block Volume mounts at another path
+  assert:
+    that:
+      - (local_block_volume_active_targets.stdout_lines | default([]) | difference([local_block_volume_normalized_mount_point])) | length == 0
+      - (local_block_volume_persistent_targets.stdout_lines | default([]) | difference([local_block_volume_normalized_mount_point])) | length == 0
+    fail_msg: "The local Block Volume UUID is already configured at another mount point."
+
+- name: Verify an existing mount uses the local Block Volume
+  command: "findmnt -rn -o UUID -M {{ local_block_volume_normalized_mount_point }}"
+  register: local_block_volume_mounted_uuid
+  changed_when: false
+  when: local_block_volume_mountpoint_check.rc == 0
+
+- name: Reject a mount point used by another filesystem
+  assert:
+    that:
+      - local_block_volume_mounted_uuid.stdout == local_block_volume_uuid.stdout
+    fail_msg: "{{ local_block_volume_normalized_mount_point }} is mounted from another filesystem."
+  when: local_block_volume_mountpoint_check.rc == 0
+
+- name: Mount the local Block Volume by UUID
+  mount:
+    path: "{{ local_block_volume_normalized_mount_point }}"
+    src: "UUID={{ local_block_volume_uuid.stdout }}"
+    fstype: "{{ local_block_volume_filesystem }}"
+    opts: defaults,noatime,_netdev
+    state: mounted
+
+- name: Set local Block Volume mount permissions
+  file:
+    path: "{{ local_block_volume_normalized_mount_point }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ privilege_group_name | default(ansible_user) }}"
+    mode: '0775'
+
+- name: Verify the mounted local Block Volume UUID
+  command: "findmnt -rn -o UUID -M {{ local_block_volume_normalized_mount_point }}"
+  register: local_block_volume_verified_uuid
+  changed_when: false
+  failed_when: local_block_volume_verified_uuid.stdout != local_block_volume_uuid.stdout

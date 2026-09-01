@@ -20,6 +20,10 @@
           image: ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa #TO EDIT
           targetCompartment: ocid1.compartment.oc1.. #TO EDIT
           boot_volume_size: 100
+          use_local_block_volume: false
+          local_block_volume_size: 1000
+          local_block_volume_performance: "10. Balanced performance"
+          local_block_volume_mount_point: /scratch
           use_marketplace_image: true
           instance_pool_ocpus: 2
           instance_pool_memory: 16
@@ -43,6 +47,10 @@
           image: ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa #TO EDIT
           targetCompartment: ocid1.compartment.oc1.. #TO EDIT
           boot_volume_size: 100
+          use_local_block_volume: false
+          local_block_volume_size: 1000
+          local_block_volume_performance: "10. Balanced performance"
+          local_block_volume_mount_point: /scratch
           use_marketplace_image: true
           instance_pool_ocpus: 2
           instance_pool_memory: 16
@@ -69,6 +77,10 @@
           image: ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa #TO EDIT
           targetCompartment: ocid1.compartment.oc1.. #TO EDIT
           boot_volume_size: 100
+          use_local_block_volume: false
+          local_block_volume_size: 1000
+          local_block_volume_performance: "10. Balanced performance"
+          local_block_volume_mount_point: /scratch
           use_marketplace_image: false
           use_compute_agent: true
           instance_pool_ocpus: 8
@@ -97,6 +109,10 @@
           image: ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa #TO EDIT: A10 GPU desktop image
           targetCompartment: ocid1.compartment.oc1.. #TO EDIT
           boot_volume_size: 100
+          use_local_block_volume: false
+          local_block_volume_size: 1000
+          local_block_volume_performance: "10. Balanced performance"
+          local_block_volume_mount_point: /scratch
           use_marketplace_image: false
           use_compute_agent: true
           instance_pool_ocpus: 8
@@ -124,6 +140,10 @@
           image: ocid1.image.oc1.eu-frankfurt-1.aaaaaaaasrw572lodukbaxlwrrq5zcqe3zldh3krkgtq3lm463lann4ksxeq #TO EDIT
           targetCompartment: ocid1.compartment.oc1.. #TO EDIT
           boot_volume_size: 100
+          use_local_block_volume: false
+          local_block_volume_size: 1000
+          local_block_volume_performance: "10. Balanced performance"
+          local_block_volume_mount_point: /scratch
           use_marketplace_image: false
           instance_pool_ocpus: 2
           instance_pool_memory: 16
@@ -146,6 +166,10 @@
           image: ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa #TO EDIT
           targetCompartment: ocid1.compartment.oc1.. #TO EDIT
           boot_volume_size: 100
+          use_local_block_volume: false
+          local_block_volume_size: 1000
+          local_block_volume_performance: "10. Balanced performance"
+          local_block_volume_mount_point: /scratch
           use_marketplace_image: false
           instance_pool_ocpus: 2
           instance_pool_memory: 2

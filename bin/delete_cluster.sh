@@ -23,11 +23,22 @@ logs_folder=$folder/../logs
 cd $autoscaling_folder/clusters/$1
 cluster_id=`cat cluster_id`
 echo $date >> $logs_folder/delete_${cluster_id}.log 2>&1
+exec 9>".oci-hpc-resize.lock"
+if ! flock -n 9
+then
+    echo "The cluster is currently being resized; retry deletion after it finishes"
+    exit 1
+fi
 if [ -f "currently_destroying" ] && [[ $2 != FORCE ]]
 then 
     echo "The cluster is already being destroyed"
+    flock -u 9
+    exec 9>&-
+    exit 1
 else
   echo $1 >> currently_destroying
+  flock -u 9
+  exec 9>&-
   if [ -f $monitoring_folder/activated ]
   then
     source $monitoring_folder/env
@@ -36,7 +47,7 @@ else
   if [ -f inventory ] 
   then
     echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
-    $folder/cleanup.sh $1 >> $logs_folder/delete_${cluster_id}.log 2>&1
+    OCI_HPC_ALLOW_DURING_DESTROY=1 $folder/cleanup.sh $1 >> $logs_folder/delete_${cluster_id}.log 2>&1
     status_initial_deletion=$?
   else
     echo "The inventory file was never created, terraform failed before that step" >> $logs_folder/delete_${cluster_id}.log 2>&1
@@ -45,8 +56,20 @@ else
   if [ $status_initial_deletion -ne 0 ] && [[ $2 == FORCE ]]
   then
     echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
-    $folder/cleanup.sh $1 FORCE >> $logs_folder/delete_${cluster_id}.log 2>&1
+    OCI_HPC_ALLOW_DURING_DESTROY=1 $folder/cleanup.sh $1 FORCE >> $logs_folder/delete_${cluster_id}.log 2>&1
     status_initial_deletion=$?
+  fi
+  if [ -f inventory ]
+  then
+    echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
+    OCI_HPC_ALLOW_DURING_DESTROY=1 python3 $folder/resize.py --cluster_name "$1" cleanup_compute_cluster >> $logs_folder/delete_${cluster_id}.log 2>&1
+    status_compute_cleanup=$?
+    if [ $status_compute_cleanup -ne 0 ]
+    then
+      echo "Compute Cluster instance cleanup failed; Terraform destroy will still be attempted" >> $logs_folder/delete_${cluster_id}.log 2>&1
+    fi
+  else
+    status_compute_cleanup=0
   fi
   i=0
   echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
@@ -68,6 +91,12 @@ else
         sed "s~variable \"node_count\" { default=\"$size\"~variable \"node_count\" { default=\"$actualSize\"~g" variables.tf > /tmp/$1_variables.tf
         mv /tmp/$1_variables.tf variables.tf
     fi
+    if [ $status_compute_cleanup -ne 0 ] && [ -f inventory ]
+    then
+      echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
+      OCI_HPC_ALLOW_DURING_DESTROY=1 python3 $folder/resize.py --cluster_name "$1" cleanup_compute_cluster >> $logs_folder/delete_${cluster_id}.log 2>&1
+      status_compute_cleanup=$?
+    fi
     echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
     terraform init >> $logs_folder/delete_${cluster_id}.log 2>&1
     terraform destroy -auto-approve >> $logs_folder/delete_${cluster_id}.log 2>&1
@@ -78,6 +107,12 @@ else
     fi
     sleep 120
   done 
+  if [ $status_compute_cleanup -ne 0 ] && [ -f inventory ]
+  then
+    echo `date -u '+%Y%m%d%H%M'` >> $logs_folder/delete_${cluster_id}.log 2>&1
+    OCI_HPC_ALLOW_DURING_DESTROY=1 python3 $folder/resize.py --cluster_name "$1" cleanup_compute_cluster >> $logs_folder/delete_${cluster_id}.log 2>&1
+    status_compute_cleanup=$?
+  fi
   end=`date -u +%s`
   end_timestamp=`date -u +'%F %T'`
   runtime=$((end-start))
@@ -89,7 +124,11 @@ else
       mysql -u $ENV_MYSQL_USER -p$ENV_MYSQL_PASS -e "use $ENV_MYSQL_DATABASE_NAME; INSERT INTO cluster_log.errors_timeserie (cluster_id,state,error_log,error_type,created_on_m) VALUES ('$cluster_id','deletion','$logs_folder/delete_${cluster_id}.log','Ansible Cleanup may not have finished properly `tail $logs_folder/delete_${cluster_id}.log | grep Error`','$end_timestamp');" >> $logs_folder/delete_${cluster_id}.log 2>&1
     fi
   fi
-  if [ $status_terraform_deletion -eq 0 ]
+  if [ $status_compute_cleanup -ne 0 ]
+  then
+    echo "Compute Cluster instance cleanup failed before Terraform destroy" >> $logs_folder/delete_${cluster_id}.log 2>&1
+  fi
+  if [ $status_terraform_deletion -eq 0 ] && [ $status_compute_cleanup -eq 0 ]
   then
     echo "Successfully deleted cluster $1 in $runtime seconds"
     if [ -f $monitoring_folder/activated ]
@@ -108,13 +147,19 @@ else
     fi
     cd
     rm -rf $autoscaling_folder/clusters/$1 | tee -a $logs_folder/delete_${cluster_id}.log 2>&1
+    exit 0
   else
-    echo "Could not delete cluster $1 in 5 tries (Time: $runtime seconds)"
+    echo "Could not fully delete cluster $1 (Terraform status: $status_terraform_deletion, Compute Cluster cleanup status: $status_compute_cleanup, Time: $runtime seconds)"
     rm currently_destroying
     if [ -f $monitoring_folder/activated ]
     then
       mysql -u $ENV_MYSQL_USER -p$ENV_MYSQL_PASS -e "use $ENV_MYSQL_DATABASE_NAME; INSERT INTO cluster_log.errors_timeserie (cluster_id,state,error_log,error_type,created_on_m) VALUES ('$cluster_id','deletion','$logs_folder/delete_${cluster_id}.log','`tail $logs_folder/delete_${cluster_id}.log | grep Error`','$end_timestamp');" >> $logs_folder/delete_${cluster_id}.log 2>&1
       mysql -u $ENV_MYSQL_USER -p$ENV_MYSQL_PASS -e "use $ENV_MYSQL_DATABASE_NAME; UPDATE cluster_log.clusters SET started_deletion=NULL,state='running' WHERE id='$cluster_id'" >> $logs_folder/delete_${cluster_id}.log 2>&1
     fi
+    if [ $status_terraform_deletion -ne 0 ]
+    then
+      exit $status_terraform_deletion
+    fi
+    exit $status_compute_cleanup
   fi
 fi

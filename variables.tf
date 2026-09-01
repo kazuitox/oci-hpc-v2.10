@@ -38,6 +38,50 @@ variable "cluster_network_shape" { default = "BM.Optimized3.36" }
 variable "instance_pool_shape" { default = "VM.Standard.E6.Flex" }
 variable "node_count" { default = 0 }
 variable "boot_volume_size" { default = 100 }
+variable "use_local_block_volume" {
+  type    = bool
+  default = false
+}
+variable "local_block_volume_size" {
+  type    = number
+  default = 1000
+
+  validation {
+    condition     = var.local_block_volume_size >= 50 && floor(var.local_block_volume_size) == var.local_block_volume_size
+    error_message = "local_block_volume_size must be an integer of at least 50 GB."
+  }
+}
+variable "local_block_volume_performance" {
+  type    = string
+  default = "10. Balanced performance"
+
+  validation {
+    condition = contains([
+      "0.  Lower performance",
+      "10. Balanced performance",
+      "20. High Performance",
+    ], var.local_block_volume_performance)
+    error_message = "local_block_volume_performance must be one of the supported Block Volume performance values."
+  }
+}
+variable "local_block_volume_mount_point" {
+  type    = string
+  default = "/scratch"
+
+  validation {
+    condition = (
+      var.local_block_volume_mount_point == trimspace(var.local_block_volume_mount_point) &&
+      length(trimspace(var.local_block_volume_mount_point)) > 1 &&
+      length(trimspace(var.local_block_volume_mount_point)) <= 200 &&
+      can(regex("^/[A-Za-z0-9._/-]+$", trimspace(var.local_block_volume_mount_point))) &&
+      alltrue([
+        for index, component in split("/", trimsuffix(trimspace(var.local_block_volume_mount_point), "/")) :
+        index == 0 ? component == "" : !contains(["", ".", ".."], component)
+      ])
+    )
+    error_message = "local_block_volume_mount_point must be a canonical absolute path other than / and at most 200 characters."
+  }
+}
 variable "use_marketplace_image" { default = false }
 variable "image" { default = "ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa" }
 variable "image_ocid" { default = "ocid1.image.oc1..aaaaaaaa5yxem7wzie34hi5km4qm2t754tsfxrjuefyjivebrxjad4jcj5oa" }

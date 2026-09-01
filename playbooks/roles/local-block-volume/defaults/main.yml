@@ -1,0 +1,4 @@
+---
+local_block_volume_device: /dev/oracleoci/oraclevdc
+local_block_volume_device_wait_timeout: 300
+

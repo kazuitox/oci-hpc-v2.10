@@ -6,12 +6,50 @@ resource "oci_core_instance_configuration" "cluster-network-instance_configurati
 
   instance_details {
     instance_type = "compute"
+
+    dynamic "block_volumes" {
+      for_each = tobool(var.use_local_block_volume) ? [1] : []
+      content {
+        attach_details {
+          type         = "iscsi"
+          device       = "/dev/oracleoci/oraclevdc"
+          display_name = "${local.cluster_name}-local-scratch-attachment"
+          is_read_only = false
+          is_shareable = false
+          use_chap     = false
+        }
+
+        create_details {
+          availability_domain = var.ad
+          compartment_id      = var.targetCompartment
+          display_name        = "${local.cluster_name}-local-scratch"
+          size_in_gbs         = tonumber(var.local_block_volume_size)
+          vpus_per_gb         = tonumber(split(".", var.local_block_volume_performance)[0])
+
+          freeform_tags = {
+            "cluster_name"          = local.cluster_name
+            "parent_cluster"        = local.cluster_name
+            "oci_hpc_local_scratch" = "true"
+          }
+        }
+      }
+    }
+
     launch_details {
       availability_domain = var.ad
       compartment_id      = var.targetCompartment
       create_vnic_details {
       }
       display_name = local.cluster_name
+      freeform_tags = {
+        "cluster_name"                     = local.cluster_name
+        "parent_cluster"                   = local.cluster_name
+        "user"                             = var.tags
+        "oci_hpc_local_block_volume"       = tostring(tobool(var.use_local_block_volume))
+        "oci_hpc_local_block_volume_size"  = tostring(tonumber(var.local_block_volume_size))
+        "oci_hpc_local_block_volume_vpus"  = tostring(tonumber(split(".", var.local_block_volume_performance)[0]))
+        "oci_hpc_local_block_volume_mount" = var.local_block_volume_mount_point
+      }
       metadata = {
 # TODO: add user key to the authorized_keys 
         ssh_authorized_keys = file("/home/${var.controller_username}/.ssh/id_rsa.pub")
@@ -27,6 +65,13 @@ resource "oci_core_instance_configuration" "cluster-network-instance_configurati
           desired_state = "DISABLED"
           name          = "OS Management Service Agent"
           }
+        dynamic plugins_config {
+          for_each = tobool(var.use_local_block_volume) ? [1] : []
+          content {
+            name          = "Block Volume Management"
+            desired_state = "ENABLED"
+          }
+        }
         dynamic plugins_config {
           
           for_each = var.use_compute_agent ? ["ENABLED"] : ["DISABLED"]
@@ -73,4 +118,3 @@ resource "oci_core_instance_configuration" "cluster-network-instance_configurati
   
   source = "NONE"
 }
-

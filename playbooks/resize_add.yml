@@ -42,6 +42,13 @@
 
 - hosts: compute_to_add
   become: true
+  tasks:
+    - include_role:
+        name: local-block-volume
+      when: use_local_block_volume | default(false) | bool
+
+- hosts: compute_to_add
+  become: true
   gather_facts: true
   tasks: 
     - include_role: 
