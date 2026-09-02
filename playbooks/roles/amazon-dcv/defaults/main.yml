@@ -34,5 +34,5 @@ ood_dcv_common_rpms:
 
 ood_dcv_gpu_rpms:
   - name: nice-dcv-gl-2025.0.1112-1.el8.x86_64.rpm
-    sha256: 80bfed40233d06aac0cb4b99ccfcfeff800c71c62ad6a39a2bd70896c38fed3b
+    sha256: 80bfed40233a06aac0cb4b99ccfcfeff800c71c62ad6a39a2bd70896c38fed3b
     verify_path: /usr/sbin/dcvgladmin
