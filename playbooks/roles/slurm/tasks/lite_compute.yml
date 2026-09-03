@@ -79,27 +79,26 @@
   set_fact: nodes_to_add="{{nodes_to_add_temp_results.results | map(attribute='ansible_facts.nodes_to_add_temp') | list }}"
   run_once: true
 
-- name: Get nodes from Cluster Switch
-  block:
-    - name: Get nodes from topology.conf
-      shell: "cat {{ slurm_conf_path }}/topology.conf | grep \"SwitchName={{cluster_name}}\""
-      register: cluster_switch
-      run_once: true
-      delegate_to: 127.0.0.1
-    - name: Get cluster_hostlist
-      command: "scontrol show hostname {{cluster_switch.stdout.split('Nodes=')[1]}}"
-      register: cluster_hostlist
-      run_once: true
-      delegate_to: 127.0.0.1
-    - name: Create new cluster_hostlist
-      command: "scontrol show hostlistsorted {{cluster_hostlist.stdout_lines | union(nodes_to_add) | join(',') }}"
-      register: cluster_hostlist_condensed_results
-      delegate_to: 127.0.0.1
-  rescue:
-    - name: Create existing cluster list
-      command: "scontrol show hostlistsorted {{ nodes_to_add | join(',') }}"
-      register: cluster_hostlist_condensed_results
-      delegate_to: 127.0.0.1
+- name: Get nodes from topology.conf
+  command: "grep -E ^SwitchName={{ cluster_name }}[[:space:]]+Nodes= {{ slurm_conf_path }}/topology.conf"
+  register: cluster_switch
+  changed_when: false
+  failed_when: cluster_switch.rc not in [0, 1]
+  run_once: true
+  delegate_to: 127.0.0.1
+
+- name: Get cluster_hostlist
+  command: "scontrol show hostname {{ cluster_switch.stdout.split('Nodes=')[1] }}"
+  register: cluster_hostlist
+  when: cluster_switch.rc == 0
+  run_once: true
+  delegate_to: 127.0.0.1
+
+- name: Create updated cluster_hostlist
+  command: "scontrol show hostlistsorted {{ (cluster_hostlist.stdout_lines | default([])) | union(nodes_to_add) | join(',') }}"
+  register: cluster_hostlist_condensed_results
+  run_once: true
+  delegate_to: 127.0.0.1
 
 - name: Get nodes from Inactive Switch
   vars:
