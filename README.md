@@ -281,6 +281,8 @@ cluster user delete <name>
 
 追加時には LDAP の `mail` 属性、ユーザー専用の OCI Notifications Topic / EMAIL Subscription、通知レジストリをまとめて作成します。削除時には通知レジストリからユーザーを外した後、LDAP ユーザーと Subscription / Topic を削除します。OCI Notifications から届く確認メールは、受信者が承認する必要があります。OCI リソースの削除が一時的に失敗した場合は、復旧後に `cluster notification cleanup` を実行すると記録済みの削除処理を再試行できます。
 
+ユーザー専用 Topic の名前は `slurm-<cluster>-<user>-<12桁の識別子>` です。末尾の識別子はデプロイ固有の通知スコープとユーザー名から決定的に生成され、同名のクラスタやユーザーが別スタックに存在する場合、および名前の正規化・切り詰め後に同じ文字列になる場合の衝突を防ぎます。同じ通知スコープとユーザー名の組み合わせでは常に同じ値になります。
+
 ## Slurm ジョブメール通知
 
 スタック作成時に「Slurm ジョブメール通知を有効化」を選び、管理者メールアドレスを入力すると、次のリソースと設定を自動構成します。
@@ -312,7 +314,13 @@ cluster notification sync
 
 通知レジストリは両 Controller へ同期しますが、未配信イベントのスプールは各 Controller のローカル領域です。障害直前に active Controller に残った未配信イベントは、その Controller が復旧してワーカーが再開するまで配信されません。
 
-LDAP ユーザー用の Topic / Subscription は `cluster user add` が作成するため Terraform state には含まれません。通知機能の無効化またはスタック削除前に、対象 LDAP ユーザーを `cluster user delete` してこれらのリソースを削除してください。
+LDAP ユーザー用の Topic / Subscription は `cluster user add` が作成するため Terraform state には含まれません。通知機能の無効化または Resource Manager でのスタック削除時には、Controller と通知用 IAM Policy を削除する前に destroy cleanup を実行し、現在のデプロイが `cluster-cli` で作成した Topic を自動削除します。cleanup が完了しない場合はリソースの取り残しを防ぐため Destroy を失敗させるので、原因を解消して再実行してください。この仕組みを含まないバージョンから更新する既存スタックでは、Resource Manager の Terraform バージョンを 1.5.x に更新し、Destroy 前に一度 Apply して cleanup を Terraform state に登録する必要があります。Apply 前に Controller や IAM リソースを削除した場合は、残った Topic を OCI Console または OCI CLI で手動削除してください。
+
+既存スタックで通知機能を `true` から `false` に変更すると、ユーザー用通知リソースを削除する終了処理として扱います。同じスタックでの再有効化は対象外のため、一時停止目的では無効化せず、再び有効化する場合はスタックを新規作成してください。通知を有効にしたまま Slurm だけを無効化することはできません。Slurm も終了する場合は、通知機能も同時に `false` にしてください。
+
+通知機能を有効にした既存スタックの `region` または `targetCompartment` を Apply で変更する移設操作は対象外です。移設する場合は、変更前の設定のままスタックを Destroy して通知リソースの cleanup 完了を確認してから、新しい配置先へスタックを作成してください。
+
+Destroy 開始後は `cluster user add` など、通知リソースを新しく作る操作を行わないでください。
 
 この機能を有効化するスタック実行者には、テナンシのホームリージョンで Dynamic Group と IAM Policy を作成できる権限、および対象 Compartment で Notifications Topic / Subscription を作成できる権限が必要です。新規 VCN の Service Gateway 経路、または既存ネットワークから OCI API への HTTPS 到達性も必要です。Instance Principal の権限は Controller インスタンス全体に付与されるため、Controller へのシェルアクセスは信頼できる利用者に限定し、通知リソースを配置する Compartment の分離も検討してください。
 

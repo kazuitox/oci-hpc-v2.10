@@ -69,6 +69,7 @@ class ClusterCliNotificationTests(unittest.TestCase):
                 "compartment_id": "ocid1.compartment.test",
                 "cluster_name": "trial-cluster",
                 "cluster_scope_id": "scope-1234",
+                "deployment_id": "0123456789abcdef0123456789abcdef",
                 "auth": "instance_principal",
             },
             "users": users or {},
@@ -214,9 +215,23 @@ class ClusterCliNotificationTests(unittest.TestCase):
             commands[0][commands[0].index("--freeform-tags") + 1]
         )
         self.assertEqual(tags["notification_scope"], "scope-1234")
+        self.assertEqual(
+            tags["notification_deployment_id"],
+            "0123456789abcdef0123456789abcdef",
+        )
         self.assertEqual(tags["slurm_user"], "alice")
         self.assertEqual(tags["managed_by"], "cluster-cli")
         self.assertTrue(tags["notification_provision_id"])
+
+    def test_notification_config_requires_a_lowercase_hex_deployment_id(self):
+        for deployment_id in ("", "ABCDEF" * 6, "g" * 32, "a" * 31):
+            with self.subTest(deployment_id=deployment_id):
+                registry = self.enabled_registry()
+                registry["config"]["deployment_id"] = deployment_id
+                with self.assertRaisesRegex(
+                    self.module.NotificationError, "deployment_id"
+                ):
+                    self.module._validated_notification_config(registry)
 
     def test_topic_absence_check_reads_topic_id_from_oci_json(self):
         config = self.enabled_registry()["config"]
@@ -453,6 +468,7 @@ class ClusterCliNotificationTests(unittest.TestCase):
             "cluster_name": "trial-cluster",
             "parent_cluster": "trial-cluster",
             "notification_scope": "scope-1234",
+            "notification_deployment_id": "0123456789abcdef0123456789abcdef",
             "notification_provision_id": "provision-attempt-1",
             "slurm_user": "alice",
             "managed_by": "cluster-cli",

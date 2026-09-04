@@ -1791,7 +1791,7 @@ variables:
     type: boolean
     title: Slurm ジョブメール通知を有効化
     default: false
-    description: OCI Notifications を使用して、Slurm ジョブの開始・終了・失敗をメールで通知できるようにします。Controller 専用の Dynamic Group と IAM Policy、初期ユーザー用 Topic と Subscription を作成します。
+    description: OCI Notifications を使用して、Slurm ジョブの開始・終了・失敗をメールで通知できるようにします。Controller 専用の Dynamic Group と IAM Policy、初期ユーザー用 Topic と Subscription を作成します。slurm=true が必要です。初回デプロイ時に選択してください。既存スタックで true から false への変更はユーザー用通知リソースの終了処理となり、同じスタックでの再有効化は対象外です。通知を有効にしたまま region または targetCompartment を変更する移設も対象外です。
   slurm_notification_admin_email:
     type: string
     title: 管理者メールアドレス

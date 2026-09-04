@@ -197,6 +197,7 @@ resource "null_resource" "cluster_backup" {
   }, var.slurm_job_notifications_enabled ? {
     slurm_notification_settings = sha256(jsonencode([
       local.slurm_notification_cluster_scope,
+      local.slurm_notification_deployment_id,
       local.slurm_notification_topic_id,
       local.slurm_notification_subscription_id,
       local.slurm_notification_controller_instance_ids,
@@ -248,6 +249,7 @@ resource "null_resource" "cluster_backup" {
       slurm_notification_region = var.region,
       slurm_notification_compartment_id = var.targetCompartment,
       slurm_notification_cluster_scope = local.slurm_notification_cluster_scope,
+      slurm_notification_deployment_id = local.slurm_notification_deployment_id,
       slurm_notification_local_user = local.controller_username,
       slurm_notification_admin_email = local.slurm_notification_admin_email,
       slurm_notification_topic_id = local.slurm_notification_topic_id,
@@ -408,6 +410,7 @@ resource "null_resource" "cluster_backup" {
       slurm_notification_region = var.region,
       slurm_notification_compartment_id = var.targetCompartment,
       slurm_notification_cluster_scope = local.slurm_notification_cluster_scope,
+      slurm_notification_deployment_id = local.slurm_notification_deployment_id,
       slurm_notification_local_user = local.controller_username,
       slurm_notification_admin_email = local.slurm_notification_admin_email,
       slurm_notification_topic_id = local.slurm_notification_topic_id,

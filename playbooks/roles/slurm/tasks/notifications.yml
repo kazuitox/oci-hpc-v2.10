@@ -71,6 +71,15 @@
     group: root
     mode: "0755"
 
+- name: Slurm notifications | Install destroy cleanup helper
+  become: true
+  ansible.builtin.copy:
+    src: slurm_oci_notification_cleanup.py
+    dest: /usr/local/libexec/oci-hpc/slurm-notification-destroy-cleanup
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Slurm notifications | Allow the controller user to update the registry
   become: true
   ansible.builtin.user:

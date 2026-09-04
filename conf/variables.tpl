@@ -41,6 +41,7 @@ variable "slurm_job_notifications_enabled" { default = ${slurm_job_notifications
 variable "slurm_notification_region" { default = "${slurm_notification_region}" }
 variable "slurm_notification_compartment_id" { default = "${slurm_notification_compartment_id}" }
 variable "slurm_notification_cluster_scope" { default = "${slurm_notification_cluster_scope}" }
+variable "slurm_notification_deployment_id" { default = "${slurm_notification_deployment_id}" }
 variable "slurm_notification_local_user" { default = "${slurm_notification_local_user}" }
 variable "slurm_notification_admin_email" {
   default   = "${slurm_notification_admin_email}"

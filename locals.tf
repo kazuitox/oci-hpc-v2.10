@@ -96,7 +96,8 @@ locals {
   
   cluster_name = var.use_custom_name ? var.cluster_name : random_pet.name.id
 
-  slurm_notification_cluster_scope  = "${substr(local.cluster_name, 0, 128)}:${random_pet.name.id}:${substr(md5(var.targetCompartment), 0, 12)}"
+  slurm_notification_cluster_scope   = "${substr(local.cluster_name, 0, 128)}:${random_pet.name.id}:${substr(md5(var.targetCompartment), 0, 12)}"
+  slurm_notification_deployment_id   = substr(sha256(tls_private_key.ssh.public_key_openssh), 0, 32)
   slurm_notification_identity_suffix = substr(md5(local.slurm_notification_cluster_scope), 0, 12)
   slurm_notification_admin_email = var.slurm_job_notifications_enabled ? regex(
     "^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,63}$",
@@ -111,6 +112,7 @@ locals {
     filesha256("${path.module}/playbooks/roles/slurm/tasks/backup_server.yml"),
     filesha256("${path.module}/playbooks/roles/slurm/tasks/notifications.yml"),
     filesha256("${path.module}/playbooks/roles/slurm/files/slurm_notification_registry_seed.py"),
+    filesha256("${path.module}/playbooks/roles/slurm/files/slurm_oci_notification_cleanup.py"),
     filesha256("${path.module}/playbooks/roles/slurm/files/slurm_oci_mailprog.py"),
     filesha256("${path.module}/playbooks/roles/slurm/files/slurm_oci_notify_worker.py"),
     filesha256("${path.module}/playbooks/roles/slurm/templates/slurm.conf.j2"),
@@ -126,6 +128,15 @@ locals {
   slurm_notification_subscription_id = var.slurm_job_notifications_enabled ? (
     oci_ons_subscription.slurm_local_user_email[0].id
   ) : ""
+  slurm_notification_destroy_cleanup_config_base64 = base64encode(jsonencode({
+    region              = var.region
+    compartment_id      = var.targetCompartment
+    cluster_name        = local.cluster_name
+    cluster_scope_id    = local.slurm_notification_cluster_scope
+    deployment_id       = local.slurm_notification_deployment_id
+    registry_path       = "/opt/oci-hpc/conf/slurm_notification_users.json"
+    protected_topic_ids = var.slurm_job_notifications_enabled ? [local.slurm_notification_topic_id] : []
+  }))
   slurm_notification_local_topic_suffix = substr(
     sha256("${local.slurm_notification_cluster_scope}:${local.controller_username}"),
     0,

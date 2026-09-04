@@ -60,6 +60,7 @@ resource "local_file" "inventory" {
     slurm_notification_region = var.slurm_notification_region,
     slurm_notification_compartment_id = var.slurm_notification_compartment_id,
     slurm_notification_cluster_scope = var.slurm_notification_cluster_scope,
+    slurm_notification_deployment_id = var.slurm_notification_deployment_id,
     slurm_notification_local_user = var.slurm_notification_local_user,
     slurm_notification_admin_email = var.slurm_notification_admin_email,
     slurm_notification_topic_id = var.slurm_notification_topic_id,

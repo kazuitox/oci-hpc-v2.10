@@ -9,6 +9,43 @@ import stat
 import tempfile
 
 
+def notification_scope(config):
+    """Return a validated cleanup-scope record, or None for legacy empty config."""
+    cluster_name = config.get("cluster_name")
+    cluster_scope_id = config.get("cluster_scope_id")
+    if cluster_name is None and cluster_scope_id is None:
+        return None
+    if not isinstance(cluster_name, str) or not cluster_name:
+        raise ValueError("notification registry cluster_name is invalid")
+    if not isinstance(cluster_scope_id, str) or not cluster_scope_id:
+        raise ValueError("notification registry cluster_scope_id is invalid")
+    return {
+        "cluster_name": cluster_name,
+        "cluster_scope_id": cluster_scope_id,
+    }
+
+
+def cleanup_scope_history(config):
+    """Validate and de-duplicate the recorded notification scope history."""
+    history = config.get("cleanup_scopes", [])
+    if not isinstance(history, list):
+        raise ValueError("notification registry cleanup_scopes must be a list")
+
+    result = []
+    seen = set()
+    for entry in history:
+        if not isinstance(entry, dict):
+            raise ValueError("notification registry has an invalid cleanup scope")
+        scope = notification_scope(entry)
+        if scope is None:
+            raise ValueError("notification registry has an empty cleanup scope")
+        identity = (scope["cluster_name"], scope["cluster_scope_id"])
+        if identity not in seen:
+            seen.add(identity)
+            result.append(scope)
+    return result
+
+
 def load_json(path, default):
     try:
         with open(path, "r", encoding="utf-8") as stream:
@@ -54,7 +91,39 @@ def merge_registry(registry_path, bootstrap):
         config = registry.get("config", {})
         if not isinstance(config, dict):
             config = {}
+
+        previous_deployment_id = config.get("deployment_id")
+        next_deployment_id = bootstrap["config"].get("deployment_id")
+        if (
+            previous_deployment_id is not None
+            and previous_deployment_id != next_deployment_id
+        ):
+            raise ValueError("notification registry belongs to another deployment")
+
+        # Cluster names are mutable, while dynamically-created Topics keep the
+        # tags and deterministic names from their creation scope. Preserve the
+        # previous pair so the final destroy can identify those Topics without
+        # deleting them during an ordinary update.
+        history = cleanup_scope_history(config)
+        previous_scope = notification_scope(config)
+        next_scope = notification_scope(bootstrap["config"])
+        history_identities = {
+            (scope["cluster_name"], scope["cluster_scope_id"])
+            for scope in history
+        }
+        if previous_scope is not None and previous_scope != next_scope:
+            previous_identity = (
+                previous_scope["cluster_name"],
+                previous_scope["cluster_scope_id"],
+            )
+            if previous_identity not in history_identities:
+                history.append(previous_scope)
+
         config.update(bootstrap["config"])
+        if history:
+            config["cleanup_scopes"] = history
+        else:
+            config.pop("cleanup_scopes", None)
         registry["config"] = config
 
         user = bootstrap["bootstrap_user"]
@@ -101,7 +170,13 @@ def main():
         parser.error("bootstrap file has no config object")
     if not isinstance(bootstrap.get("bootstrap_user"), dict):
         parser.error("bootstrap file has no bootstrap_user object")
-    required_config = ("region", "compartment_id", "cluster_name", "cluster_scope_id")
+    required_config = (
+        "region",
+        "compartment_id",
+        "cluster_name",
+        "cluster_scope_id",
+        "deployment_id",
+    )
     required_user = ("username", "email", "topic_id", "subscription_id")
     if any(not bootstrap["config"].get(key) for key in required_config):
         parser.error("bootstrap config is incomplete")

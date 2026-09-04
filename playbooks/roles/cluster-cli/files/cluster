@@ -215,7 +215,8 @@ def _validated_notification_config(registry):
   config = dict(registry.get('config', {}))
   missing = [
     field for field in (
-      'region', 'compartment_id', 'cluster_name', 'cluster_scope_id'
+      'region', 'compartment_id', 'cluster_name', 'cluster_scope_id',
+      'deployment_id'
     ) if not str(config.get(field, '')).strip()
   ]
   if missing:
@@ -223,6 +224,11 @@ def _validated_notification_config(registry):
       'Notification registry is missing required config: {}'.format(
         ', '.join(missing)
       )
+    )
+
+  if re.fullmatch(r'[0-9a-f]{32}', str(config['deployment_id'])) is None:
+    raise NotificationError(
+      'Notification registry deployment_id must be 32 lowercase hex characters'
     )
 
   auth = config.get('auth', 'instance_principal')
@@ -676,6 +682,7 @@ def _create_notification_resources(config, user, email):
     'cluster_name': config['cluster_name'],
     'parent_cluster': config['cluster_name'],
     'notification_scope': config['cluster_scope_id'],
+    'notification_deployment_id': config['deployment_id'],
     'notification_provision_id': provision_id,
     'slurm_user': user,
     'managed_by': 'cluster-cli',

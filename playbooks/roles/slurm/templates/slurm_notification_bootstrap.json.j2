@@ -5,6 +5,7 @@
     "compartment_id": {{ slurm_notification_compartment_id | to_json }},
     "cluster_name": {{ cluster_name | to_json }},
     "cluster_scope_id": {{ slurm_notification_cluster_scope | to_json }},
+    "deployment_id": {{ slurm_notification_deployment_id | to_json }},
     "auth": "instance_principal"
   },
   "bootstrap_user": {

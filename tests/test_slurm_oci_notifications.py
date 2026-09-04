@@ -459,6 +459,7 @@ class NotificationRegistrySeedTests(unittest.TestCase):
                 "compartment_id": "ocid1.compartment.example",
                 "cluster_name": "trial",
                 "cluster_scope_id": "scope",
+                "deployment_id": "0123456789abcdef0123456789abcdef",
                 "auth": "instance_principal",
             },
             "bootstrap_user": {
@@ -499,6 +500,7 @@ class NotificationRegistrySeedTests(unittest.TestCase):
                 "compartment_id": "ocid1.compartment.example",
                 "cluster_name": "trial",
                 "cluster_scope_id": "scope",
+                "deployment_id": "0123456789abcdef0123456789abcdef",
                 "auth": "instance_principal",
             },
             "bootstrap_user": {
@@ -518,6 +520,113 @@ class NotificationRegistrySeedTests(unittest.TestCase):
             with open(registry_path, encoding="utf-8") as stream:
                 registry = json.load(stream)
         self.assertEqual(registry["config"]["pending_cleanup"], pending)
+
+    def test_bootstrap_merge_records_changed_scope_history_without_duplicates(self):
+        def bootstrap(cluster_name, cluster_scope_id):
+            return {
+                "config": {
+                    "enabled": True,
+                    "region": "ap-tokyo-1",
+                    "compartment_id": "ocid1.compartment.example",
+                    "cluster_name": cluster_name,
+                    "cluster_scope_id": cluster_scope_id,
+                    "deployment_id": "0123456789abcdef0123456789abcdef",
+                    "auth": "instance_principal",
+                },
+                "bootstrap_user": {
+                    "username": "opc",
+                    "email": "admin@example.com",
+                    "topic_id": "ocid1.onstopic.opc",
+                    "subscription_id": "ocid1.onssubscription.opc",
+                },
+            }
+
+        existing = {
+            "config": bootstrap("old", "old:scope")["config"],
+            "users": {},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            registry_path = os.path.join(directory, "slurm_notification_users.json")
+            with open(registry_path, "w", encoding="utf-8") as stream:
+                json.dump(existing, stream)
+            self.module.merge_registry(registry_path, bootstrap("new", "new:scope"))
+            # Reapplying the same configuration must not duplicate history.
+            self.module.merge_registry(registry_path, bootstrap("new", "new:scope"))
+            self.module.merge_registry(registry_path, bootstrap("newer", "newer:scope"))
+            with open(registry_path, encoding="utf-8") as stream:
+                registry = json.load(stream)
+
+        self.assertEqual(
+            registry["config"]["cleanup_scopes"],
+            [
+                {"cluster_name": "old", "cluster_scope_id": "old:scope"},
+                {"cluster_name": "new", "cluster_scope_id": "new:scope"},
+            ],
+        )
+
+    def test_bootstrap_merge_rejects_malformed_scope_history(self):
+        bootstrap = {
+            "config": {
+                "enabled": True,
+                "region": "ap-tokyo-1",
+                "compartment_id": "ocid1.compartment.example",
+                "cluster_name": "trial",
+                "cluster_scope_id": "scope",
+                "deployment_id": "0123456789abcdef0123456789abcdef",
+                "auth": "instance_principal",
+            },
+            "bootstrap_user": {
+                "username": "opc",
+                "email": "admin@example.com",
+                "topic_id": "ocid1.onstopic.opc",
+                "subscription_id": "ocid1.onssubscription.opc",
+            },
+        }
+        existing = {
+            "config": {"cleanup_scopes": [{"cluster_name": "old"}]},
+            "users": {},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            registry_path = os.path.join(directory, "slurm_notification_users.json")
+            with open(registry_path, "w", encoding="utf-8") as stream:
+                json.dump(existing, stream)
+            with self.assertRaises(ValueError):
+                self.module.merge_registry(registry_path, bootstrap)
+            with open(registry_path, encoding="utf-8") as stream:
+                unchanged = json.load(stream)
+        self.assertEqual(unchanged, existing)
+
+    def test_bootstrap_merge_rejects_another_deployment_registry(self):
+        bootstrap = {
+            "config": {
+                "enabled": True,
+                "region": "ap-tokyo-1",
+                "compartment_id": "ocid1.compartment.example",
+                "cluster_name": "trial",
+                "cluster_scope_id": "trial:firm-earwig:7c586774a476",
+                "deployment_id": "0123456789abcdef0123456789abcdef",
+                "auth": "instance_principal",
+            },
+            "bootstrap_user": {
+                "username": "opc",
+                "email": "admin@example.com",
+                "topic_id": "ocid1.onstopic.opc",
+                "subscription_id": "ocid1.onssubscription.opc",
+            },
+        }
+        existing = {
+            "config": {"deployment_id": "f" * 32},
+            "users": {"alice": {"topic_id": "ocid1.onstopic.alice"}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            registry_path = os.path.join(directory, "slurm_notification_users.json")
+            with open(registry_path, "w", encoding="utf-8") as stream:
+                json.dump(existing, stream)
+            with self.assertRaisesRegex(ValueError, "another deployment"):
+                self.module.merge_registry(registry_path, bootstrap)
+            with open(registry_path, encoding="utf-8") as stream:
+                unchanged = json.load(stream)
+        self.assertEqual(unchanged, existing)
 
     def test_disable_preserves_users_and_marks_config_disabled(self):
         existing = {
