@@ -144,7 +144,10 @@
     owner: slurm
     group: slurm
     backup: yes
-  
+
+- name: Configure OCI Notifications mail delivery
+  ansible.builtin.include_tasks: notifications.yml
+
 - name: Generate slurm.conf
   become: true
   template: 

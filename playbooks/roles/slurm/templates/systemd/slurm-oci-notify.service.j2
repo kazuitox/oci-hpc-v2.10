@@ -1,0 +1,26 @@
+[Unit]
+Description=Deliver queued Slurm job notifications through OCI Notifications
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ controller_username }}
+Group={{ controller_username }}
+TimeoutStartSec=10min
+Environment=HOME=/home/{{ controller_username }}
+Environment=PATH=/home/{{ controller_username }}/.local/bin:/home/{{ controller_username }}/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/sbin/slurm-oci-notify-worker
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+{% if ansible_os_family == 'RedHat' and (ansible_distribution_major_version | int) <= 7 %}
+ProtectSystem=full
+ReadOnlyDirectories={{ slurm_notification_registry_path }}
+ReadWriteDirectories={{ slurm_notification_spool_path }}
+{% else %}
+ProtectSystem=strict
+ReadOnlyPaths={{ slurm_notification_registry_path }}
+ReadWritePaths={{ slurm_notification_spool_path }}
+{% endif %}

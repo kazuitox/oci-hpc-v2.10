@@ -1,0 +1,208 @@
+---
+- name: Slurm notifications | Create helper directory
+  become: true
+  ansible.builtin.file:
+    path: /usr/local/libexec/oci-hpc
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Slurm notifications | Disable delivery triggers before registry changes
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - slurm-oci-notify.path
+    - slurm-oci-notify.timer
+  failed_when: false
+  when: not (slurm_job_notifications_enabled | default(false) | bool)
+
+- name: Slurm notifications | Stop delivery worker before disabling the registry
+  become: true
+  ansible.builtin.systemd:
+    name: slurm-oci-notify.service
+    state: stopped
+  failed_when: false
+  when: not (slurm_job_notifications_enabled | default(false) | bool)
+
+- name: Slurm notifications | Verify OCI CLI for the delivery user
+  become: true
+  become_user: "{{ controller_username }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/env
+      - oci
+      - --version
+  environment:
+    HOME: "/home/{{ controller_username }}"
+    PATH: "/home/{{ controller_username }}/.local/bin:/home/{{ controller_username }}/bin:/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Install MailProg
+  become: true
+  ansible.builtin.copy:
+    src: slurm_oci_mailprog.py
+    dest: /usr/local/sbin/slurm-oci-mailprog
+    owner: root
+    group: root
+    mode: "0755"
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Install delivery worker
+  become: true
+  ansible.builtin.copy:
+    src: slurm_oci_notify_worker.py
+    dest: /usr/local/sbin/slurm-oci-notify-worker
+    owner: root
+    group: root
+    mode: "0755"
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Install registry merge helper
+  become: true
+  ansible.builtin.copy:
+    src: slurm_notification_registry_seed.py
+    dest: /usr/local/libexec/oci-hpc/slurm-notification-registry-seed
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Slurm notifications | Allow the controller user to update the registry
+  become: true
+  ansible.builtin.user:
+    name: "{{ controller_username }}"
+    groups: slurm
+    append: true
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Create delivery spool
+  become: true
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: slurm
+    group: "{{ controller_username }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ slurm_notification_spool_path }}"
+      mode: "2770"
+    - path: "{{ slurm_notification_spool_path }}/failed"
+      mode: "2770"
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Install failed-message retention policy
+  become: true
+  ansible.builtin.template:
+    src: slurm-oci-notify-tmpfiles.conf.j2
+    dest: /etc/tmpfiles.d/slurm-oci-notify.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Render bootstrap registry data
+  become: true
+  ansible.builtin.template:
+    src: slurm_notification_bootstrap.json.j2
+    dest: /opt/oci-hpc/conf/.slurm_notification_bootstrap.json
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Merge bootstrap user into runtime registry
+  become: true
+  ansible.builtin.command:
+    argv:
+      - /usr/local/libexec/oci-hpc/slurm-notification-registry-seed
+      - --bootstrap-file
+      - /opt/oci-hpc/conf/.slurm_notification_bootstrap.json
+      - --registry
+      - "{{ slurm_notification_registry_path }}"
+  no_log: true
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Remove bootstrap registry data
+  become: true
+  ansible.builtin.file:
+    path: /opt/oci-hpc/conf/.slurm_notification_bootstrap.json
+    state: absent
+
+- name: Slurm notifications | Check for an existing runtime registry
+  become: true
+  ansible.builtin.stat:
+    path: "{{ slurm_notification_registry_path }}"
+  register: slurm_notification_registry
+  when: not (slurm_job_notifications_enabled | default(false) | bool)
+
+- name: Slurm notifications | Mark the runtime registry disabled
+  become: true
+  ansible.builtin.command:
+    argv:
+      - /usr/local/libexec/oci-hpc/slurm-notification-registry-seed
+      - --disable
+      - --registry
+      - "{{ slurm_notification_registry_path }}"
+  when:
+    - not (slurm_job_notifications_enabled | default(false) | bool)
+    - slurm_notification_registry.stat.exists | default(false)
+
+- name: Slurm notifications | Check runtime registry after configuration
+  become: true
+  ansible.builtin.stat:
+    path: "{{ slurm_notification_registry_path }}"
+  register: slurm_notification_registry_after_configuration
+
+- name: Slurm notifications | Protect runtime registry
+  become: true
+  ansible.builtin.file:
+    path: "{{ slurm_notification_registry_path }}"
+    state: file
+    owner: "{{ controller_username }}"
+    group: slurm
+    mode: "0640"
+  when: slurm_notification_registry_after_configuration.stat.exists
+
+- name: Slurm notifications | Protect runtime registry lock
+  become: true
+  ansible.builtin.file:
+    path: "{{ slurm_notification_registry_path }}.lock"
+    state: touch
+    access_time: preserve
+    modification_time: preserve
+    owner: "{{ controller_username }}"
+    group: "{{ controller_username }}"
+    mode: "0600"
+  when: slurm_notification_registry_after_configuration.stat.exists
+
+- name: Slurm notifications | Install systemd units
+  become: true
+  ansible.builtin.template:
+    src: "systemd/{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - slurm-oci-notify.service
+    - slurm-oci-notify.path
+    - slurm-oci-notify.timer
+  notify: reload systemd units
+  when: slurm_job_notifications_enabled | default(false) | bool
+
+- name: Slurm notifications | Enable delivery triggers
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - slurm-oci-notify.path
+    - slurm-oci-notify.timer
+  when: slurm_job_notifications_enabled | default(false) | bool

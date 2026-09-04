@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- Slurmの`BEGIN` / `END` / `FAIL`イベントをOCI Notifications経由でメール送信する機能を追加しました。
+- OpenComposerのジョブフォームにメール通知の有効化と通知タイミングの選択項目を追加しました。
+- LDAPユーザーの追加・削除と連動してNotifications Topic / Subscriptionおよび通知レジストリを管理できるようにしました。
+
 ### Changed
 
 - Open OnDemandのAmazon DCV連携とNVIDIA A10 GPUデスクトップを独立したオプションに分離しました。

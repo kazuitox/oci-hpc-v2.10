@@ -1,7 +1,7 @@
 title: HPC クラスタ
 description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
-version: '2026061401'
+version: '2026090301'
 informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
@@ -241,6 +241,11 @@ variableGroups:
   - ${ood_desktop_use_gpu}
   - ${ood_vnc_use_gpu}
   - ${ood_source_cidr}
+- title: Slurm ジョブメール通知
+  variables:
+  - ${slurm_job_notifications_enabled}
+  - ${slurm_notification_admin_email}
+  visible: ${slurm}
 - title: ソフトウェア
   variables:
   - ${privilege_sudo}
@@ -1782,6 +1787,20 @@ variables:
     title: SLURM をインストール
     default: true
     description: Autoscaling に必要です
+  slurm_job_notifications_enabled:
+    type: boolean
+    title: Slurm ジョブメール通知を有効化
+    default: false
+    description: OCI Notifications を使用して、Slurm ジョブの開始・終了・失敗をメールで通知できるようにします。Controller 専用の Dynamic Group と IAM Policy、初期ユーザー用 Topic と Subscription を作成します。
+  slurm_notification_admin_email:
+    type: string
+    title: 管理者メールアドレス
+    description: controller のローカルユーザー（通常は opc）が実行したジョブの通知先です。デプロイ後、OCI Notifications から届く確認メールで Subscription を承認してください。
+    default: ''
+    maxLength: 254
+    pattern: '^(|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63})$'
+    required: true
+    visible: ${slurm_job_notifications_enabled}
   slurm_nfs:
     type: boolean
     title: spool directory を共有

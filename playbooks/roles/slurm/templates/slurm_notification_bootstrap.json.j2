@@ -1,0 +1,17 @@
+{
+  "config": {
+    "enabled": true,
+    "region": {{ slurm_notification_region | to_json }},
+    "compartment_id": {{ slurm_notification_compartment_id | to_json }},
+    "cluster_name": {{ cluster_name | to_json }},
+    "cluster_scope_id": {{ slurm_notification_cluster_scope | to_json }},
+    "auth": "instance_principal"
+  },
+  "bootstrap_user": {
+    "username": {{ slurm_notification_local_user | default(controller_username) | to_json }},
+    "email": {{ slurm_notification_admin_email | to_json }},
+    "topic_id": {{ slurm_notification_topic_id | to_json }},
+    "subscription_id": {{ slurm_notification_subscription_id | to_json }},
+    "managed_by": "terraform"
+  }
+}

@@ -102,9 +102,11 @@ resource "oci_core_instance" "controller" {
 
 resource "null_resource" "controller" { 
   depends_on = [oci_core_instance.controller, oci_core_volume_attachment.controller_volume_attachment ] 
-  triggers = { 
+  triggers = merge({
     controller = oci_core_instance.controller.id
-  } 
+  }, var.slurm_job_notifications_enabled ? {
+    slurm_notification_payload = local.slurm_notification_payload_hash
+  } : {})
 
   provisioner "remote-exec" {
     inline = [
@@ -230,12 +232,28 @@ resource "null_resource" "controller" {
   }
 }
 resource "null_resource" "cluster" { 
-  depends_on = [null_resource.controller, null_resource.backup, oci_core_compute_cluster.compute_cluster, oci_core_cluster_network.cluster_network, oci_core_instance.controller, oci_core_volume_attachment.controller_volume_attachment]
-  triggers = { 
+  depends_on = [
+    null_resource.controller,
+    null_resource.backup,
+    oci_core_compute_cluster.compute_cluster,
+    oci_core_cluster_network.cluster_network,
+    oci_core_instance.controller,
+    oci_core_volume_attachment.controller_volume_attachment,
+    oci_identity_policy.slurm_notification_controllers,
+  ]
+  triggers = merge({
     cluster_instances           = join(", ", local.cluster_instances_names)
     cluster_instance_ids        = join(", ", local.cluster_instances_ids)
     local_block_volume_settings = sha256(jsonencode([var.use_local_block_volume, var.local_block_volume_size, var.local_block_volume_performance, var.local_block_volume_mount_point]))
-  } 
+  }, var.slurm_job_notifications_enabled ? {
+    slurm_notification_settings = sha256(jsonencode([
+      local.slurm_notification_cluster_scope,
+      local.slurm_notification_topic_id,
+      local.slurm_notification_subscription_id,
+      local.slurm_notification_controller_instance_ids,
+      local.slurm_notification_payload_hash,
+    ]))
+  } : {})
 
   provisioner "file" {
     content        = templatefile("${path.module}/inventory.tpl", {  
@@ -277,6 +295,14 @@ resource "null_resource" "cluster" {
       cluster_network = var.cluster_network,
       use_compute_agent = var.use_compute_agent,
       slurm = var.slurm,
+      slurm_job_notifications_enabled = var.slurm_job_notifications_enabled,
+      slurm_notification_region = var.region,
+      slurm_notification_compartment_id = var.targetCompartment,
+      slurm_notification_cluster_scope = local.slurm_notification_cluster_scope,
+      slurm_notification_local_user = local.controller_username,
+      slurm_notification_admin_email = local.slurm_notification_admin_email,
+      slurm_notification_topic_id = local.slurm_notification_topic_id,
+      slurm_notification_subscription_id = local.slurm_notification_subscription_id,
       rack_aware = var.rack_aware,
       slurm_nfs_path = var.slurm_nfs ? var.nfs_source_path : var.cluster_nfs_path,
       spack = var.spack,
@@ -429,6 +455,14 @@ resource "null_resource" "cluster" {
       scratch_nfs_path = var.scratch_nfs_path,
       use_scratch_nfs = var.use_scratch_nfs,
       slurm = var.slurm,
+      slurm_job_notifications_enabled = var.slurm_job_notifications_enabled,
+      slurm_notification_region = var.region,
+      slurm_notification_compartment_id = var.targetCompartment,
+      slurm_notification_cluster_scope = local.slurm_notification_cluster_scope,
+      slurm_notification_local_user = local.controller_username,
+      slurm_notification_admin_email = local.slurm_notification_admin_email,
+      slurm_notification_topic_id = local.slurm_notification_topic_id,
+      slurm_notification_subscription_id = local.slurm_notification_subscription_id,
       rack_aware = var.rack_aware,
       slurm_nfs_path = var.add_nfs ? var.nfs_source_path : var.cluster_nfs_path,
       spack = var.spack,

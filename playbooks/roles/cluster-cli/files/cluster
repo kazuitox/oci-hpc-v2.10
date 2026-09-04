@@ -1,20 +1,833 @@
 #!/usr/bin/env python3
+import base64
+import datetime
+import fcntl
+import hashlib
+import json
 import ldap3
 from ldap3 import MODIFY_ADD
 import click
 import grp
 import pwd
 import os
+import re
+import shlex
+import stat
+import subprocess
+import tempfile
+import uuid
 
 host = 'controller'
 bind_dn = 'cn=manager,dc=local'
 groups_dn = 'ou=Group,dc=local'
 people_dn = 'ou=People,dc=local'
+notification_registry_path = '/opt/oci-hpc/conf/slurm_notification_users.json'
+ansible_inventory_path = '/etc/ansible/hosts'
+cluster_ssh_key_path = '~/.ssh/cluster.key'
+
+email_pattern = re.compile(
+  r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+  r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+  r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+)
+
+# The cluster CLI is installed only on the primary controller.  Feed this
+# self-contained helper to ``python3 -`` over SSH so the backup needs no extra
+# executable beyond the notification registry installed by the Slurm role.
+backup_sync_helper_source = r'''
+import base64
+import fcntl
+import json
+import os
+import stat
+import sys
+import tempfile
+
+path = sys.argv[1]
+payload_bytes = base64.b64decode(
+    encoded_payload.encode("ascii"), altchars=b"-_", validate=True
+)
+payload = json.loads(payload_bytes.decode("utf-8"))
+if (
+    not isinstance(payload, dict)
+    or payload.get("version") != 1
+    or not isinstance(payload.get("cluster_scope_id"), str)
+    or not isinstance(payload.get("users"), dict)
+):
+    raise ValueError("invalid notification registry snapshot")
+for username, entry in payload["users"].items():
+    if not isinstance(username, str) or not isinstance(entry, dict):
+        raise ValueError("invalid notification registry user")
+    required = ("email", "topic_id", "subscription_id", "managed_by")
+    if any(
+        not isinstance(entry.get(field), str) or not entry.get(field)
+        for field in required
+    ):
+        raise ValueError("invalid notification registry routing")
+
+lock_path = path + ".lock"
+with open(lock_path, "a+") as lock_file:
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+    with open(path, "r") as registry_file:
+        registry = json.load(registry_file)
+    if registry.get("config", {}).get("cluster_scope_id") != payload["cluster_scope_id"]:
+        raise ValueError("notification registry cluster scope mismatch")
+    registry["users"] = payload["users"]
+    existing_stat = os.stat(path)
+    descriptor, temporary_path = tempfile.mkstemp(
+        prefix=".slurm_notification_users.", suffix=".tmp", dir=os.path.dirname(path)
+    )
+    try:
+        with os.fdopen(descriptor, "w") as temporary_file:
+            json.dump(registry, temporary_file, indent=2, sort_keys=True)
+            temporary_file.write("\n")
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+            os.fchmod(temporary_file.fileno(), stat.S_IMODE(existing_stat.st_mode))
+            os.fchown(
+                temporary_file.fileno(), existing_stat.st_uid, existing_stat.st_gid
+            )
+        os.replace(temporary_path, path)
+    finally:
+        if os.path.exists(temporary_path):
+            os.unlink(temporary_path)
+'''
  
 #bind_pass = 'zEEUM6Vrqtfl4hBz0ebF'
 
 with open('/etc/opt/oci-hpc/passwords/openldap/root.txt', 'r') as f: 
   bind_pass = f.read().splitlines()[0]
+
+
+class NotificationError(RuntimeError):
+  pass
+
+
+def _empty_notification_registry():
+  return {
+    'config': {
+      'enabled': False,
+      'region': '',
+      'compartment_id': '',
+      'cluster_name': '',
+      'cluster_scope_id': '',
+      'auth': 'instance_principal',
+    },
+    'users': {},
+  }
+
+
+def _normalize_notification_registry(registry):
+  if not isinstance(registry, dict):
+    raise NotificationError('Notification registry must contain a JSON object')
+
+  config = registry.get('config', {})
+  users = registry.get('users', {})
+  if not isinstance(config, dict) or not isinstance(users, dict):
+    raise NotificationError(
+      "Notification registry fields 'config' and 'users' must be JSON objects"
+    )
+
+  normalized = dict(registry)
+  normalized['config'] = dict(config)
+  normalized['users'] = dict(users)
+  return normalized
+
+
+def _load_notification_registry(path=None):
+  if path is None:
+    path = notification_registry_path
+  try:
+    with open(path, 'r') as registry_file:
+      return _normalize_notification_registry(json.load(registry_file))
+  except FileNotFoundError:
+    return _empty_notification_registry()
+  except (OSError, ValueError) as error:
+    raise NotificationError(
+      'Unable to read notification registry {}: {}'.format(path, error)
+    ) from error
+
+
+def _update_notification_registry(mutator, path=None):
+  """Update the runtime registry while retaining its owner, group, and mode."""
+  if path is None:
+    path = notification_registry_path
+
+  directory = os.path.dirname(path)
+  lock_path = path + '.lock'
+  try:
+    os.makedirs(directory, exist_ok=True)
+    with open(lock_path, 'a+') as lock_file:
+      fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+      registry = _load_notification_registry(path)
+      result = mutator(registry)
+
+      existing_stat = None
+      try:
+        existing_stat = os.stat(path)
+      except FileNotFoundError:
+        pass
+
+      file_descriptor, temporary_path = tempfile.mkstemp(
+        prefix='.slurm_notification_users.',
+        suffix='.tmp',
+        dir=directory,
+      )
+      try:
+        with os.fdopen(file_descriptor, 'w') as temporary_file:
+          json.dump(registry, temporary_file, indent=2, sort_keys=True)
+          temporary_file.write('\n')
+          temporary_file.flush()
+          os.fsync(temporary_file.fileno())
+          if existing_stat is not None:
+            os.fchmod(
+              temporary_file.fileno(), stat.S_IMODE(existing_stat.st_mode)
+            )
+            os.fchown(
+              temporary_file.fileno(),
+              existing_stat.st_uid,
+              existing_stat.st_gid,
+            )
+          else:
+            os.fchmod(temporary_file.fileno(), 0o640)
+        os.replace(temporary_path, path)
+      finally:
+        if os.path.exists(temporary_path):
+          os.unlink(temporary_path)
+      return result
+  except NotificationError:
+    raise
+  except OSError as error:
+    raise NotificationError(
+      'Unable to update notification registry {}: {}'.format(path, error)
+    ) from error
+
+
+def _notifications_enabled(registry):
+  enabled = registry.get('config', {}).get('enabled', False)
+  if isinstance(enabled, str):
+    return enabled.strip().lower() in ('1', 'true', 'yes', 'on')
+  return bool(enabled)
+
+
+def _validated_notification_config(registry):
+  config = dict(registry.get('config', {}))
+  missing = [
+    field for field in (
+      'region', 'compartment_id', 'cluster_name', 'cluster_scope_id'
+    ) if not str(config.get(field, '')).strip()
+  ]
+  if missing:
+    raise NotificationError(
+      'Notification registry is missing required config: {}'.format(
+        ', '.join(missing)
+      )
+    )
+
+  auth = config.get('auth', 'instance_principal')
+  if auth != 'instance_principal':
+    raise NotificationError(
+      "Unsupported notification auth '{}'; expected instance_principal".format(
+        auth
+      )
+    )
+  config['auth'] = auth
+  return config
+
+
+def _validate_email(email):
+  if (
+    not isinstance(email, str)
+    or len(email) > 254
+    or email_pattern.fullmatch(email) is None
+  ):
+    return False
+  local_part = email.rsplit('@', 1)[0]
+  return (
+    not local_part.startswith('.')
+    and not local_part.endswith('.')
+    and '..' not in local_part
+  )
+
+
+def _topic_component(value, maximum_length=48):
+  component = re.sub(r'[^a-z0-9_-]+', '-', str(value).lower()).strip('-_')
+  return (component or 'user')[:maximum_length]
+
+
+def _notification_topic_name(config, user):
+  identity = '{}:{}'.format(config['cluster_scope_id'], user)
+  suffix = hashlib.sha256(identity.encode('utf-8')).hexdigest()[:12]
+  return 'slurm-{}-{}-{}'.format(
+    _topic_component(config['cluster_name']),
+    _topic_component(user),
+    suffix,
+  )
+
+
+def _run_oci(config, arguments):
+  command = ['oci'] + arguments + [
+    '--auth', config['auth'],
+    '--region', config['region'],
+  ]
+  try:
+    return subprocess.run(
+      command,
+      check=True,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      universal_newlines=True,
+      timeout=120,
+    )
+  except FileNotFoundError as error:
+    raise NotificationError('OCI CLI executable was not found') from error
+  except subprocess.CalledProcessError as error:
+    detail = (error.stderr or error.stdout or '').strip()
+    if detail:
+      raise NotificationError('OCI CLI failed: {}'.format(detail)) from error
+    raise NotificationError(
+      'OCI CLI failed with exit status {}'.format(error.returncode)
+    ) from error
+  except subprocess.TimeoutExpired as error:
+    raise NotificationError('OCI CLI timed out after 120 seconds') from error
+  except OSError as error:
+    raise NotificationError('Unable to execute OCI CLI: {}'.format(error)) from error
+
+
+def _oci_identifier(result, resource_name):
+  identifier = (result.stdout or '').strip()
+  if not identifier.startswith('ocid1.'):
+    raise NotificationError(
+      'OCI CLI did not return a valid {} OCID'.format(resource_name)
+    )
+  return identifier
+
+
+def _delete_error_may_mean_absent(error):
+  detail = str(error).lower()
+  return 'notauthorizedornotfound' in detail or re.search(
+    r'(^|[^0-9])404([^0-9]|$)', detail
+  ) is not None
+
+
+def _notification_resource_is_absent(config, resource_type, resource_id):
+  """Confirm absence through an authorized compartment list operation."""
+  result = _run_oci(config, [
+    'ons', resource_type, 'list',
+    '--compartment-id', config['compartment_id'],
+    '--all',
+    '--output', 'json',
+  ])
+  try:
+    payload = json.loads(result.stdout or '')
+    resources = payload.get('data')
+  except (AttributeError, TypeError, ValueError) as error:
+    raise NotificationError(
+      'OCI CLI returned invalid {} list output'.format(resource_type)
+    ) from error
+  if not isinstance(resources, list):
+    raise NotificationError(
+      'OCI CLI returned invalid {} list output'.format(resource_type)
+    )
+  return not any(
+    isinstance(resource, dict) and resource.get('id') == resource_id
+    for resource in resources
+  )
+
+
+def _delete_notification_resources(config, entry):
+  """Best-effort delete. Return errors and the identifiers still needing cleanup."""
+  errors = []
+  remaining = dict(entry)
+  subscription_id = entry.get('subscription_id')
+  topic_id = entry.get('topic_id')
+
+  if subscription_id:
+    try:
+      _run_oci(config, [
+        'ons', 'subscription', 'delete',
+        '--subscription-id', subscription_id,
+        '--force',
+      ])
+      remaining.pop('subscription_id', None)
+    except NotificationError as error:
+      absent = False
+      verification_error = None
+      if _delete_error_may_mean_absent(error):
+        try:
+          absent = _notification_resource_is_absent(
+            config, 'subscription', subscription_id
+          )
+        except NotificationError as caught_error:
+          verification_error = caught_error
+      if absent:
+        remaining.pop('subscription_id', None)
+      else:
+        detail = 'subscription {}: {}'.format(subscription_id, error)
+        if verification_error is not None:
+          detail += '; absence verification failed: {}'.format(
+            verification_error
+          )
+        errors.append(detail)
+
+  if topic_id:
+    try:
+      _run_oci(config, [
+        'ons', 'topic', 'delete',
+        '--topic-id', topic_id,
+        '--force',
+      ])
+      remaining.pop('topic_id', None)
+    except NotificationError as error:
+      absent = False
+      verification_error = None
+      if _delete_error_may_mean_absent(error):
+        try:
+          absent = _notification_resource_is_absent(
+            config, 'topic', topic_id
+          )
+        except NotificationError as caught_error:
+          verification_error = caught_error
+      if absent:
+        remaining.pop('topic_id', None)
+      else:
+        detail = 'topic {}: {}'.format(topic_id, error)
+        if verification_error is not None:
+          detail += '; absence verification failed: {}'.format(
+            verification_error
+          )
+        errors.append(detail)
+
+  return errors, remaining
+
+
+def _record_pending_cleanup(user, entry, errors):
+  if not entry.get('topic_id') and not entry.get('subscription_id'):
+    return
+
+  def record(registry):
+    config = registry.setdefault('config', {})
+    pending = config.setdefault('pending_cleanup', [])
+    pending.append({
+      'cleanup_id': str(uuid.uuid4()),
+      'username': user,
+      'email': entry.get('email', ''),
+      'topic_id': entry.get('topic_id', ''),
+      'subscription_id': entry.get('subscription_id', ''),
+      'managed_by': 'cluster-cli',
+      'errors': errors,
+      'recorded_at': datetime.datetime.now(
+        datetime.timezone.utc
+      ).isoformat(),
+    })
+
+  _update_notification_registry(record)
+
+
+def _prepare_pending_cleanup():
+  """Validate the cleanup journal and give every entry a stable identifier."""
+  def prepare(registry):
+    validated_config = _validated_notification_config(registry)
+    config = registry.setdefault('config', {})
+    pending = config.get('pending_cleanup', [])
+    if not isinstance(pending, list):
+      raise NotificationError(
+        "Notification registry field 'pending_cleanup' must be a list"
+      )
+
+    snapshot = []
+    cleanup_ids = set()
+    for entry in pending:
+      if not isinstance(entry, dict):
+        raise NotificationError('Invalid pending notification cleanup entry')
+      cleanup_id = entry.get('cleanup_id')
+      if (
+        not isinstance(cleanup_id, str)
+        or not cleanup_id
+        or cleanup_id in cleanup_ids
+      ):
+        cleanup_id = str(uuid.uuid4())
+        entry['cleanup_id'] = cleanup_id
+      cleanup_ids.add(cleanup_id)
+      snapshot.append(dict(entry))
+    return validated_config, snapshot
+
+  return _update_notification_registry(prepare)
+
+
+def _commit_pending_cleanup_results(results):
+  """Atomically remove or replace journal entries by their stable identifier."""
+  def commit(registry):
+    config = registry.setdefault('config', {})
+    pending = config.get('pending_cleanup', [])
+    if not isinstance(pending, list):
+      raise NotificationError(
+        "Notification registry field 'pending_cleanup' must be a list"
+      )
+
+    matched = set()
+    updated = []
+    for entry in pending:
+      if not isinstance(entry, dict):
+        raise NotificationError('Invalid pending notification cleanup entry')
+      cleanup_id = entry.get('cleanup_id')
+      if cleanup_id not in results:
+        updated.append(entry)
+        continue
+      matched.add(cleanup_id)
+      replacement = results[cleanup_id]
+      if replacement is not None:
+        updated.append(replacement)
+
+    missing = set(results) - matched
+    if missing:
+      raise NotificationError(
+        'Notification cleanup journal changed while cleanup was running'
+      )
+    if updated:
+      config['pending_cleanup'] = updated
+    else:
+      config.pop('pending_cleanup', None)
+
+  _update_notification_registry(commit)
+
+
+def _create_notification_resources(config, user, email):
+  tags = {
+    'cluster_name': config['cluster_name'],
+    'parent_cluster': config['cluster_name'],
+    'notification_scope': config['cluster_scope_id'],
+    'slurm_user': user,
+    'managed_by': 'cluster-cli',
+  }
+  serialized_tags = json.dumps(tags, separators=(',', ':'), sort_keys=True)
+  topic_id = None
+  try:
+    topic_result = _run_oci(config, [
+      'ons', 'topic', 'create',
+      '--compartment-id', config['compartment_id'],
+      '--name', _notification_topic_name(config, user),
+      '--description', 'Slurm job notifications for {}'.format(user),
+      '--freeform-tags', serialized_tags,
+      '--query', 'data.id',
+      '--raw-output',
+    ])
+    topic_id = _oci_identifier(topic_result, 'topic')
+
+    subscription_result = _run_oci(config, [
+      'ons', 'subscription', 'create',
+      '--compartment-id', config['compartment_id'],
+      '--topic-id', topic_id,
+      '--protocol', 'EMAIL',
+      '--subscription-endpoint', email,
+      '--freeform-tags', serialized_tags,
+      '--query', 'data.id',
+      '--raw-output',
+    ])
+    subscription_id = _oci_identifier(subscription_result, 'subscription')
+    return {
+      'email': email,
+      'topic_id': topic_id,
+      'subscription_id': subscription_id,
+      'managed_by': 'cluster-cli',
+    }
+  except NotificationError as error:
+    if topic_id:
+      cleanup_errors, remaining = _delete_notification_resources(
+        config,
+        {'topic_id': topic_id, 'managed_by': 'cluster-cli', 'email': email},
+      )
+      if cleanup_errors:
+        try:
+          _record_pending_cleanup(user, remaining, cleanup_errors)
+        except NotificationError as record_error:
+          cleanup_errors.append(
+            'could not record pending cleanup: {}'.format(record_error)
+          )
+        raise NotificationError(
+          '{}; cleanup also failed: {}'.format(error, '; '.join(cleanup_errors))
+        ) from error
+    raise
+
+
+def _store_user_routing(user, entry):
+  def store(registry):
+    users = registry.setdefault('users', {})
+    existing = users.get(user)
+    if existing is not None:
+      raise NotificationError(
+        "Notification routing already exists for user '{}'".format(user)
+      )
+    users[user] = dict(entry)
+    _mark_backup_sync_pending(
+      registry, "notification routing for '{}' was added".format(user)
+    )
+
+  _update_notification_registry(store)
+
+
+def _remove_user_routing(user):
+  def remove(registry):
+    users = registry.setdefault('users', {})
+    entry = users.get(user)
+    if entry and entry.get('managed_by') == 'terraform':
+      raise NotificationError(
+        "User '{}' is managed by Terraform and cannot be deleted by cluster".format(
+          user
+        )
+      )
+    config = dict(registry.get('config', {}))
+    if entry is not None:
+      del users[user]
+      entry = dict(entry)
+      _mark_backup_sync_pending(
+        registry, "notification routing for '{}' was removed".format(user)
+      )
+    return config, entry
+
+  return _update_notification_registry(remove)
+
+
+def _restore_user_routing(user, entry):
+  if entry is None:
+    return
+
+  def restore(registry):
+    users = registry.setdefault('users', {})
+    if user in users:
+      raise NotificationError(
+        "Cannot restore notification routing for '{}': entry already exists".format(
+          user
+        )
+      )
+    users[user] = dict(entry)
+    _mark_backup_sync_pending(
+      registry, "notification routing for '{}' was restored".format(user)
+    )
+
+  _update_notification_registry(restore)
+
+
+def _find_slurm_backup(path=None):
+  """Return (host, user) from the first [slurm_backup] inventory entry."""
+  if path is None:
+    path = ansible_inventory_path
+  try:
+    with open(path, 'r') as inventory_file:
+      section = None
+      for raw_line in inventory_file:
+        line = raw_line.strip()
+        if not line or line.startswith(('#', ';')):
+          continue
+        if line.startswith('[') and line.endswith(']'):
+          section = line[1:-1].strip()
+          continue
+        if section != 'slurm_backup':
+          continue
+
+        try:
+          fields = shlex.split(line, comments=True)
+        except ValueError as error:
+          raise NotificationError(
+            'Invalid [slurm_backup] inventory entry: {}'.format(error)
+          ) from error
+        if not fields:
+          continue
+        variables = {}
+        for field in fields[1:]:
+          if '=' in field:
+            key, value = field.split('=', 1)
+            variables[key] = value
+        host_value = variables.get('ansible_host', fields[0])
+        user_value = variables.get(
+          'ansible_user', pwd.getpwuid(os.geteuid()).pw_name
+        )
+        if (
+          not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:-]*', host_value)
+          or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9._-]*', user_value)
+        ):
+          raise NotificationError(
+            'Unsafe host or user in [slurm_backup] inventory entry'
+          )
+        return host_value, user_value
+  except FileNotFoundError as error:
+    raise NotificationError(
+      'Ansible inventory {} was not found'.format(path)
+    ) from error
+  except OSError as error:
+    raise NotificationError(
+      'Unable to read Ansible inventory {}: {}'.format(path, error)
+    ) from error
+  return None
+
+
+def _encode_backup_snapshot(registry):
+  config = _validated_notification_config(registry)
+  users = registry.get('users', {})
+  if not isinstance(users, dict):
+    raise NotificationError("Notification registry field 'users' is invalid")
+  payload = json.dumps(
+    {
+      'version': 1,
+      'cluster_scope_id': config['cluster_scope_id'],
+      'users': users,
+    },
+    separators=(',', ':'),
+    sort_keys=True,
+  ).encode('utf-8')
+  encoded_payload = base64.urlsafe_b64encode(payload).decode('ascii')
+  _decode_backup_snapshot(encoded_payload)
+  return encoded_payload
+
+
+def _decode_backup_snapshot(encoded_payload):
+  if not isinstance(encoded_payload, str) or len(encoded_payload) > 1024 * 1024:
+    raise NotificationError('Invalid backup registry synchronization payload')
+  try:
+    payload_bytes = base64.b64decode(
+      encoded_payload.encode('ascii'), altchars=b'-_', validate=True
+    )
+    payload = json.loads(payload_bytes.decode('utf-8'))
+  except (ValueError, UnicodeError, json.JSONDecodeError) as error:
+    raise NotificationError(
+      'Invalid backup registry synchronization payload'
+    ) from error
+  if (
+    not isinstance(payload, dict)
+    or payload.get('version') != 1
+    or not isinstance(payload.get('cluster_scope_id'), str)
+    or not payload.get('cluster_scope_id')
+    or not isinstance(payload.get('users'), dict)
+  ):
+    raise NotificationError('Invalid backup registry synchronization payload')
+  for username, entry in payload['users'].items():
+    if not isinstance(username, str) or not isinstance(entry, dict):
+      raise NotificationError('Invalid user in backup registry snapshot')
+    required = ('email', 'topic_id', 'subscription_id', 'managed_by')
+    if any(
+      not isinstance(entry.get(field), str) or not entry.get(field)
+      for field in required
+    ):
+      raise NotificationError(
+        "Invalid notification routing for user '{}'".format(username)
+      )
+  return payload
+
+
+def _run_backup_sync(backup, encoded_payload):
+  host_value, user_value = backup
+  if ':' in host_value:
+    host_value = '[{}]'.format(host_value)
+  target = '{}@{}'.format(user_value, host_value)
+  command = [
+    'ssh',
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=10',
+    '-o', 'StrictHostKeyChecking=no',
+    '-i', os.path.expanduser(cluster_ssh_key_path),
+    target,
+    '/usr/bin/python3',
+    '-',
+    notification_registry_path,
+  ]
+  helper_input = 'encoded_payload = {!r}\n{}'.format(
+    encoded_payload, backup_sync_helper_source
+  )
+  try:
+    subprocess.run(
+      command,
+      check=True,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      universal_newlines=True,
+      timeout=30,
+      input=helper_input,
+    )
+  except FileNotFoundError as error:
+    raise NotificationError('SSH executable was not found') from error
+  except subprocess.TimeoutExpired as error:
+    raise NotificationError(
+      'Backup controller registry synchronization timed out'
+    ) from error
+  except subprocess.CalledProcessError as error:
+    detail = (error.stderr or error.stdout or '').strip()
+    if detail:
+      raise NotificationError(
+        'Backup controller registry synchronization failed: {}'.format(detail)
+      ) from error
+    raise NotificationError(
+      'Backup controller registry synchronization failed with exit status {}'.format(
+        error.returncode
+      )
+    ) from error
+  except OSError as error:
+    raise NotificationError(
+      'Unable to synchronize the backup controller registry: {}'.format(error)
+    ) from error
+
+
+def _sync_backup_registry(registry=None):
+  backup = _find_slurm_backup()
+  if backup is None:
+    if os.path.exists(notification_registry_path):
+      current_registry = _load_notification_registry()
+      pending_sync = current_registry.get('config', {}).get(
+        'pending_backup_sync'
+      )
+      if pending_sync is not None:
+        _clear_pending_backup_sync(pending_sync)
+    return False
+  sync_lock_path = notification_registry_path + '.sync.lock'
+  try:
+    os.makedirs(os.path.dirname(notification_registry_path), exist_ok=True)
+    with open(sync_lock_path, 'a+') as sync_lock:
+      fcntl.flock(sync_lock.fileno(), fcntl.LOCK_EX)
+      # A caller may have captured its registry before another concurrent CLI
+      # mutation completed.  Serialize remote writes and always prefer the
+      # latest atomically-written local snapshot so an older snapshot cannot
+      # overwrite a newer backup registry.
+      if os.path.exists(notification_registry_path) or registry is None:
+        registry = _load_notification_registry()
+      pending_sync = registry.get('config', {}).get('pending_backup_sync')
+      _run_backup_sync(backup, _encode_backup_snapshot(registry))
+      if pending_sync is not None:
+        _clear_pending_backup_sync(pending_sync)
+    return True
+  except NotificationError:
+    raise
+  except OSError as error:
+    raise NotificationError(
+      'Unable to lock backup controller registry synchronization: {}'.format(
+        error
+      )
+    ) from error
+
+
+def _mark_backup_sync_pending(registry, detail):
+  config = registry.setdefault('config', {})
+  config['pending_backup_sync'] = {
+    'generation': str(uuid.uuid4()),
+    'recorded_at': datetime.datetime.now(
+      datetime.timezone.utc
+    ).isoformat(),
+    'error': str(detail),
+  }
+
+
+def _record_pending_backup_sync(error):
+  def record(registry):
+    _mark_backup_sync_pending(registry, error)
+
+  _update_notification_registry(record)
+
+
+def _clear_pending_backup_sync(expected_marker):
+  def clear(registry):
+    config = registry.setdefault('config', {})
+    if config.get('pending_backup_sync') == expected_marker:
+      config.pop('pending_backup_sync', None)
+
+  _update_notification_registry(clear)
 
 def exists(key, value):
     try:
@@ -61,6 +874,120 @@ def find_next_uid():
         base_uid = int(entry.uidNumber.raw_values[0])
 
     return base_uid + 1
+
+
+def _ensure_ldap_success(connection, succeeded, action):
+  result = getattr(connection, 'result', {}) or {}
+  result_code = result.get('result', 0)
+  if succeeded is False or result_code != 0:
+    detail = result.get('message') or result.get('description') or str(result)
+    raise NotificationError('{} failed: {}'.format(action, detail))
+
+
+def _create_ldap_user(user, password, uid, gid, name, email=None):
+  attributes = {
+    'sn': user,
+    'uid': user,
+    'uidNumber': uid,
+    'gidNumber': gid,
+    'userPassword': password,
+    'gecos': name,
+    'homeDirectory': '/home/{}'.format(user),
+    'displayName': name,
+    'loginShell': '/bin/bash',
+  }
+  if email:
+    attributes['mail'] = email
+
+  group_required = exists('gid', gid) is False
+  user_created = False
+  group_created = False
+  server = ldap3.Server(host, use_ssl=True)
+  with ldap3.Connection(server, bind_dn, bind_pass, auto_bind=True) as conn:
+    try:
+      added = conn.add(
+        'cn={},{}'.format(user, people_dn),
+        ['inetOrgPerson', 'posixAccount', 'top', 'shadowAccount'],
+        attributes,
+      )
+      _ensure_ldap_success(conn, added, "LDAP user '{}' creation".format(user))
+      user_created = True
+
+      if group_required:
+        click.echo('Creating group')
+        group_added = conn.add(
+          'cn={},{}'.format(user, groups_dn),
+          ['top', 'groupOfMembers', 'posixgroup'],
+          {'cn': [user], 'gidNumber': [gid]},
+        )
+        _ensure_ldap_success(
+          conn,
+          group_added,
+          "LDAP group '{}' creation".format(user),
+        )
+        group_created = True
+    except Exception:
+      if group_created:
+        conn.delete('cn={},{}'.format(user, groups_dn))
+      if user_created:
+        conn.delete('cn={},{}'.format(user, people_dn))
+      raise
+  return group_created
+
+
+def _delete_ldap_user(user):
+  server = ldap3.Server(host, use_ssl=True)
+  with ldap3.Connection(server, bind_dn, bind_pass, auto_bind=True) as conn:
+    deleted = conn.delete('cn={},{}'.format(user, people_dn))
+    _ensure_ldap_success(conn, deleted, "LDAP user '{}' deletion".format(user))
+
+
+def _rollback_ldap_user(user, group_created=False):
+  errors = []
+  try:
+    server = ldap3.Server(host, use_ssl=True)
+    with ldap3.Connection(server, bind_dn, bind_pass, auto_bind=True) as conn:
+      if group_created:
+        try:
+          conn.delete('cn={},{}'.format(user, groups_dn))
+        except Exception as error:
+          errors.append("LDAP group '{}': {}".format(user, error))
+      try:
+        conn.delete('cn={},{}'.format(user, people_dn))
+      except Exception as error:
+        errors.append("LDAP user '{}': {}".format(user, error))
+  except Exception as error:
+    errors.append("LDAP rollback connection for '{}': {}".format(user, error))
+  return errors
+
+
+def _initialize_user_home(user, nossh):
+  home_directory = '/home/{}/'.format(user)
+  subprocess.run(
+    ['sudo', 'su', '-', user, '-c', 'ls'],
+    check=False,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+  )
+
+  if not nossh:
+    private_key = os.path.join(home_directory, '.ssh', 'id_rsa')
+    public_key = private_key + '.pub'
+    authorized_keys = os.path.join(home_directory, '.ssh', 'authorized_keys')
+    subprocess.run(
+      [
+        'sudo', '-u', user,
+        'ssh-keygen', '-t', 'rsa', '-b', '2048', '-q',
+        '-f', private_key, '-N', '',
+      ],
+      check=False,
+      stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+      ['sudo', '-u', user, 'mv', public_key, authorized_keys],
+      check=False,
+      stderr=subprocess.DEVNULL,
+    )
      
 @click.group()
 def main(): 
@@ -87,8 +1014,8 @@ def add(group,user):
 
   print(conn.result)
 
-@group.command()
-def list(): 
+@group.command(name='list')
+def list_groups():
   """ list groups """
   search_base = groups_dn
   search_filter = '(cn=*)'
@@ -139,12 +1066,106 @@ def delete(group):
 def user(): 
   """ user commands """
 
-@user.command()
-def list(): 
+
+@click.group()
+def notification():
+  """ Slurm notification administration commands """
+
+
+@notification.command(name='sync')
+def sync_notification_registry():
+  """Synchronize notification routing to the backup Slurm controller."""
+  try:
+    registry = _load_notification_registry()
+    if not _notifications_enabled(registry):
+      click.echo('Slurm job notifications are disabled')
+      return
+    synchronized = _sync_backup_registry(registry)
+    if not synchronized:
+      click.echo('No Slurm backup controller is configured')
+      return
+    click.echo('Notification registry synchronized to the backup controller')
+  except NotificationError as error:
+    try:
+      _record_pending_backup_sync(error)
+    except NotificationError:
+      pass
+    raise click.ClickException(str(error)) from error
+
+
+@notification.command(name='cleanup')
+def cleanup_notification_resources():
+  """Retry deletion of OCI resources recorded in the cleanup journal."""
+  try:
+    config, pending = _prepare_pending_cleanup()
+  except NotificationError as error:
+    raise click.ClickException(str(error)) from error
+
+  if not pending:
+    click.echo('No pending notification cleanup')
+    return
+
+  results = {}
+  failure_details = []
+  for entry in pending:
+    cleanup_id = entry['cleanup_id']
+    errors, remaining = _delete_notification_resources(config, entry)
+    if errors:
+      remaining['cleanup_id'] = cleanup_id
+      remaining['errors'] = list(errors)
+      remaining['last_attempted_at'] = datetime.datetime.now(
+        datetime.timezone.utc
+      ).isoformat()
+      results[cleanup_id] = remaining
+      failure_details.append('{}: {}'.format(
+        entry.get('username', 'unknown'), '; '.join(errors)
+      ))
+    else:
+      results[cleanup_id] = None
+
+  try:
+    _commit_pending_cleanup_results(results)
+  except NotificationError as error:
+    raise click.ClickException(str(error)) from error
+
+  backup_sync_error = None
+  try:
+    _sync_backup_registry(_load_notification_registry())
+  except NotificationError as error:
+    backup_sync_error = error
+    try:
+      _record_pending_backup_sync(error)
+    except NotificationError as record_error:
+      backup_sync_error = NotificationError(
+        '{}; unable to record pending synchronization: {}'.format(
+          error, record_error
+        )
+      )
+
+  completed = len(pending) - len(failure_details)
+  if failure_details or backup_sync_error is not None:
+    message = 'Notification cleanup removed {} of {} journal entries'.format(
+      completed, len(pending)
+    )
+    if failure_details:
+      message += '; cleanup still pending: {}'.format(
+        '; '.join(failure_details)
+      )
+    if backup_sync_error is not None:
+      message += '; backup synchronization is pending: {}'.format(
+        backup_sync_error
+      )
+    raise click.ClickException(message)
+
+  click.echo('Notification cleanup removed {} journal entries'.format(completed))
+
+
+@user.command(name='list')
+def list_users():
   """ list users """
   search_base = people_dn
   search_filter = '(uid=*)'
-  attrs = ['cn', 'uid', 'uidNumber', 'gidNumber', 'homeDirectory', 'sn', 'gecos', 'loginShell', 'displayName']
+  attrs = ['cn', 'uid', 'uidNumber', 'gidNumber', 'homeDirectory', 'sn', 'gecos', 'loginShell', 'displayName', 'mail']
 
   server = ldap3.Server(host, use_ssl=True)
   with ldap3.Connection(server, bind_dn, bind_pass, auto_bind=True) as conn:
@@ -162,47 +1183,228 @@ def list():
 @click.option('-n', '--name', prompt='Full Name', required=True)
 @click.option('-i', '--uid', default=None, help='Select the userID')
 @click.option('-g', '--gid', default="9876", help='Add to this groupID')
+@click.option('-e', '--email', default=None, help='Email address for Slurm job notifications')
 @click.option('-nossh', '--nossh', is_flag=True, default=False, help='Flag to not generate a user-specific ssh-key pair for passwordless ssh.')
-def add(user, password, uid, gid, name, nossh): 
+def add(user, password, uid, gid, name, email, nossh):
   """ add user """
-  search_base = people_dn
+  try:
+    registry = _load_notification_registry()
+  except NotificationError as error:
+    raise click.ClickException(str(error)) from error
+
+  notifications_enabled = _notifications_enabled(registry)
+  config = None
+  if notifications_enabled:
+    try:
+      config = _validated_notification_config(registry)
+    except NotificationError as error:
+      raise click.ClickException(str(error)) from error
+    if email is None:
+      email = click.prompt('Email address', type=str)
+
+  if email is not None:
+    email = email.strip()
+    if not _validate_email(email):
+      raise click.BadParameter(
+        'must be a valid email address',
+        param_hint='--email',
+      )
+
   if uid is None: 
     uid = find_next_uid()
   if gid is None: 
     gid = find_next_gid()
 
-  server = ldap3.Server(host, use_ssl=True)
-  with ldap3.Connection(server, bind_dn, bind_pass, auto_bind=True) as conn:
-    conn.add("cn={},{}".format(user, search_base), ['inetOrgPerson', 'posixAccount', 'top', 'shadowAccount'], { 'sn': user, 'uid': user, 'uidNumber': uid, 'gidNumber': gid, 'userPassword': password, 'gecos': name, 'homeDirectory': '/home/{}'.format(user), 'displayName': name, 'loginShell': '/bin/bash' } )
-  if(conn.result['result'] != 0): 
-    print(conn.result)
+  routing_entry = None
+  if notifications_enabled:
+    if user in registry.get('users', {}):
+      raise click.ClickException(
+        "Notification routing already exists for user '{}'".format(user)
+      )
+    try:
+      routing_entry = _create_notification_resources(config, user, email)
+    except NotificationError as error:
+      raise click.ClickException(
+        'Unable to create OCI notification resources: {}'.format(error)
+      ) from error
 
-  if exists('gid', gid) is False:
+  try:
+    group_created = _create_ldap_user(
+      user, password, uid, gid, name, email=email
+    )
+  except Exception as error:
+    cleanup_errors = []
+    if routing_entry is not None:
+      cleanup_errors, remaining = _delete_notification_resources(
+        config, routing_entry
+      )
+      if cleanup_errors:
+        try:
+          _record_pending_cleanup(user, remaining, cleanup_errors)
+        except NotificationError as record_error:
+          cleanup_errors.append(
+            'could not record pending cleanup: {}'.format(record_error)
+          )
+    message = "Unable to create LDAP user '{}': {}".format(user, error)
+    if cleanup_errors:
+      message += '; OCI cleanup failed: {}'.format('; '.join(cleanup_errors))
+    raise click.ClickException(message) from error
 
-    click.echo('Creating group')
-    conn.add("cn={},{}".format(user, groups_dn), ['top', 'groupOfMembers', 'posixgroup'], { 'cn': [user], 'gidNumber': [gid] } )
-    if(conn.result['result'] != 0): 
-      print(conn.result)
+  if routing_entry is not None:
+    try:
+      _store_user_routing(user, routing_entry)
+    except NotificationError as error:
+      rollback_errors = _rollback_ldap_user(user, group_created)
+      cleanup_errors, remaining = _delete_notification_resources(
+        config, routing_entry
+      )
+      if cleanup_errors:
+        try:
+          _record_pending_cleanup(user, remaining, cleanup_errors)
+        except NotificationError as record_error:
+          cleanup_errors.append(
+            'could not record pending cleanup: {}'.format(record_error)
+          )
+      details = rollback_errors + cleanup_errors
+      message = 'Unable to store notification routing: {}'.format(error)
+      if details:
+        message += '; rollback issues: {}'.format('; '.join(details))
+      raise click.ClickException(message) from error
 
-  homedir='/home/{}/'.format(user)
-  os.system("sudo su - "+user+" -c "+" 'ls' 2> /dev/null")
+  backup_sync_error = None
+  if routing_entry is not None:
+    try:
+      current_registry = _load_notification_registry()
+      _sync_backup_registry(current_registry)
+    except NotificationError as error:
+      backup_sync_error = error
+      try:
+        _record_pending_backup_sync(error)
+      except NotificationError as record_error:
+        backup_sync_error = NotificationError(
+          '{}; unable to record pending synchronization: {}'.format(
+            error, record_error
+          )
+        )
 
-  if not nossh:
-    os.system("sudo su - "+user+" -c "+"' ssh-keygen -t rsa -b 2048 -q -f "+homedir+".ssh/id_rsa -P \"\"' 2> /dev/null")
-    os.system("sudo su - "+user+" -c "+"'mv "+homedir+".ssh/id_rsa.pub "+homedir+".ssh/authorized_keys' 2> /dev/null")
+  _initialize_user_home(user, nossh)
+  if routing_entry is not None:
+    click.echo(
+      'Notification subscription created for {}. '
+      'The recipient must confirm the OCI Notifications email.'.format(email)
+    )
+  if backup_sync_error is not None:
+    raise click.ClickException(
+      "LDAP user '{}' and its local notification routing were created, but "
+      'backup controller synchronization is pending: {}'.format(
+        user, backup_sync_error
+      )
+    )
+
+
 @user.command()
 @click.argument('user')
 def delete(user):
   """ delete user """
-  search_base = people_dn
-  server = ldap3.Server(host, use_ssl=True)
-  with ldap3.Connection(server, bind_dn, bind_pass, auto_bind=True) as conn:
-    conn.delete("cn={},{}".format(user, search_base))
+  if user == 'opc':
+    raise click.ClickException(
+      "User 'opc' is locally/Terraform managed and cannot be deleted by cluster"
+    )
+
+  try:
+    registry = _load_notification_registry()
+  except NotificationError as error:
+    raise click.ClickException(str(error)) from error
+
+  routing_entry = registry.get('users', {}).get(user)
+  config = dict(registry.get('config', {}))
+  if routing_entry and routing_entry.get('managed_by') == 'terraform':
+    raise click.ClickException(
+      "User '{}' is managed by Terraform and cannot be deleted by cluster".format(
+        user
+      )
+    )
+
+  if routing_entry is not None:
+    try:
+      config = _validated_notification_config(registry)
+      config, routing_entry = _remove_user_routing(user)
+    except NotificationError as error:
+      raise click.ClickException(str(error)) from error
+
+    try:
+      _sync_backup_registry(_load_notification_registry())
+    except NotificationError as error:
+      restore_errors = []
+      try:
+        _restore_user_routing(user, routing_entry)
+      except NotificationError as restore_error:
+        restore_errors.append(str(restore_error))
+      try:
+        _sync_backup_registry(_load_notification_registry())
+      except NotificationError as restore_sync_error:
+        restore_errors.append(str(restore_sync_error))
+        try:
+          _record_pending_backup_sync(restore_sync_error)
+        except NotificationError as record_error:
+          restore_errors.append(
+            'unable to record pending synchronization: {}'.format(record_error)
+          )
+      message = (
+        'Backup controller synchronization failed; LDAP user and OCI '
+        'resources were not deleted: {}'.format(error)
+      )
+      if restore_errors:
+        message += '; restore issues: {}'.format('; '.join(restore_errors))
+      raise click.ClickException(message) from error
+
+  try:
+    _delete_ldap_user(user)
+  except Exception as error:
+    restore_error = None
+    if routing_entry is not None:
+      try:
+        _restore_user_routing(user, routing_entry)
+      except NotificationError as caught_error:
+        restore_error = caught_error
+      try:
+        _sync_backup_registry(_load_notification_registry())
+      except NotificationError as caught_error:
+        try:
+          _record_pending_backup_sync(caught_error)
+        except NotificationError:
+          pass
+        if restore_error is None:
+          restore_error = caught_error
+    message = "Unable to delete LDAP user '{}': {}".format(user, error)
+    if restore_error is not None:
+      message += '; notification routing restore failed: {}'.format(
+        restore_error
+      )
+    raise click.ClickException(message) from error
+
+  if routing_entry is not None:
+    cleanup_errors, remaining = _delete_notification_resources(
+      config, routing_entry
+    )
+    if cleanup_errors:
+      try:
+        _record_pending_cleanup(user, remaining, cleanup_errors)
+      except NotificationError as record_error:
+        cleanup_errors.append(
+          'could not record pending cleanup: {}'.format(record_error)
+        )
+      raise click.ClickException(
+        "LDAP user '{}' was deleted, but OCI cleanup is pending: {}".format(
+          user, '; '.join(cleanup_errors)
+        )
+      )
 
   
   
 main.add_command(group)
 main.add_command(user)
+main.add_command(notification)
 
 if __name__ == "__main__":
-    main()
+  main()

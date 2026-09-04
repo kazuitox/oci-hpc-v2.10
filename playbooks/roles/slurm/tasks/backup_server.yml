@@ -97,6 +97,9 @@
     owner: slurm
     group: slurm
 
+- name: Configure OCI Notifications mail delivery
+  ansible.builtin.include_tasks: notifications.yml
+
 - name: move slurm.conf on backup servers
   become: true
   copy:

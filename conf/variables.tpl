@@ -37,6 +37,17 @@ variable "zone_name" {default = "${zone_name}"}
 variable "dns_entries" {default = "${dns_entries}"}
 variable "healthchecks" {default = "${healthchecks}"}
 variable "slurm" { default = ${slurm} }
+variable "slurm_job_notifications_enabled" { default = ${slurm_job_notifications_enabled} }
+variable "slurm_notification_region" { default = "${slurm_notification_region}" }
+variable "slurm_notification_compartment_id" { default = "${slurm_notification_compartment_id}" }
+variable "slurm_notification_cluster_scope" { default = "${slurm_notification_cluster_scope}" }
+variable "slurm_notification_local_user" { default = "${slurm_notification_local_user}" }
+variable "slurm_notification_admin_email" {
+  default   = "${slurm_notification_admin_email}"
+  sensitive = true
+}
+variable "slurm_notification_topic_id" { default = "${slurm_notification_topic_id}" }
+variable "slurm_notification_subscription_id" { default = "${slurm_notification_subscription_id}" }
 variable "rack_aware" { default = ${rack_aware} }
 variable "pyxis" { default = ${pyxis} }
 variable "pam" { default = ${pam} }

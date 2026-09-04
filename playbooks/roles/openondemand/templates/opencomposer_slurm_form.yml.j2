@@ -87,6 +87,27 @@ form:
     max: ["", 59]
     required: [true, true]
 
+{% if slurm_job_notifications_enabled | default(false) | bool %}
+  mail_notification_enabled:
+    widget: checkbox
+    label: メール通知
+    options:
+      - [{{ 'メール通知を送信する' | to_json }}, {{ '' | to_json }}, {{ 'enable-mail_notification_types' | to_json }}]
+    help: Slurmジョブの開始・完了・失敗を登録済みのメールアドレスへ通知します。
+
+  mail_notification_types:
+    widget: checkbox
+    label: 通知タイミング
+    direction: horizontal
+    value: {{ ['BEGIN（ジョブ開始）', 'END（ジョブ完了）', 'FAIL（ジョブ失敗）'] | to_json }}
+    separator: {{ ',' | to_json }}
+    indent: 1
+    options:
+      - [{{ 'BEGIN（ジョブ開始）' | to_json }}, {{ 'BEGIN' | to_json }}]
+      - [{{ 'END（ジョブ完了）' | to_json }}, {{ 'END' | to_json }}]
+      - [{{ 'FAIL（ジョブ失敗）' | to_json }}, {{ 'FAIL' | to_json }}]
+
+{% endif %}
   command:
     widget: text
     label: 実行コマンド
@@ -102,6 +123,8 @@ script: |
   #SBATCH --nodes=#{nodes}
   #SBATCH --ntasks-per-node=#{tasks_per_node}
   #{walltime_enabled}#{walltime_1}:#{walltime_2}:00
+{% if slurm_job_notifications_enabled | default(false) | bool %}  #SBATCH --mail-type=#{mail_notification_types}
+{% endif %}
 
   export MPI_OPTIONS="#{mpi_bm_hpc}"
   export MPI_OPTIONS="#{mpi_vm}"

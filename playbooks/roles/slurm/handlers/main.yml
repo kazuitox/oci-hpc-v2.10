@@ -1,3 +1,7 @@
+- name: reload systemd units
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
 
 - name: restart slurm server
   become: true

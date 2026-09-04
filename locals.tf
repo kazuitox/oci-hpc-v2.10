@@ -38,11 +38,12 @@ locals {
   compute_username                    = local.simple_mode && local.simple_preinstalled_compute_image ? local.simple_compute_image.username : var.compute_username
   controller_username                 = local.use_imported_compute_image_for_controller ? local.compute_username : var.controller_username
 
-  region_map = var.create_iam_policy_dynamic_group ? {
+  needs_home_region = var.create_iam_policy_dynamic_group || var.slurm_job_notifications_enabled
+  region_map = local.needs_home_region ? {
     for region in data.oci_identity_regions.regions[0].regions :
     region.key => region.name
   } : {}
-  home_region = var.create_iam_policy_dynamic_group ? local.region_map[
+  home_region = local.needs_home_region ? local.region_map[
     data.oci_identity_tenancy.tenancy[0].home_region_key
   ] : var.region
 
@@ -94,6 +95,50 @@ locals {
   controller_subnet_id = var.private_deployment ? var.use_existing_vcn ? var.public_subnet_id : element(concat(oci_core_subnet.private-subnet.*.id, [""]), 0) : var.use_existing_vcn ? var.public_subnet_id : element(concat(oci_core_subnet.public-subnet.*.id, [""]), 0)
   
   cluster_name = var.use_custom_name ? var.cluster_name : random_pet.name.id
+
+  slurm_notification_cluster_scope  = "${substr(local.cluster_name, 0, 128)}:${random_pet.name.id}:${substr(md5(var.targetCompartment), 0, 12)}"
+  slurm_notification_identity_suffix = substr(md5(local.slurm_notification_cluster_scope), 0, 12)
+  slurm_notification_admin_email = var.slurm_job_notifications_enabled ? regex(
+    "^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,63}$",
+    trimspace(var.slurm_notification_admin_email),
+  ) : trimspace(var.slurm_notification_admin_email)
+  slurm_notification_payload_hash = sha256(join("", [
+    filesha256("${path.module}/playbooks/roles/cluster-cli/files/cluster"),
+    filesha256("${path.module}/playbooks/roles/openondemand/templates/opencomposer_slurm_form.yml.j2"),
+    filesha256("${path.module}/playbooks/roles/slurm/defaults/main.yml"),
+    filesha256("${path.module}/playbooks/roles/slurm/handlers/main.yml"),
+    filesha256("${path.module}/playbooks/roles/slurm/tasks/server.yml"),
+    filesha256("${path.module}/playbooks/roles/slurm/tasks/backup_server.yml"),
+    filesha256("${path.module}/playbooks/roles/slurm/tasks/notifications.yml"),
+    filesha256("${path.module}/playbooks/roles/slurm/files/slurm_notification_registry_seed.py"),
+    filesha256("${path.module}/playbooks/roles/slurm/files/slurm_oci_mailprog.py"),
+    filesha256("${path.module}/playbooks/roles/slurm/files/slurm_oci_notify_worker.py"),
+    filesha256("${path.module}/playbooks/roles/slurm/templates/slurm.conf.j2"),
+    filesha256("${path.module}/playbooks/roles/slurm/templates/slurm_notification_bootstrap.json.j2"),
+    filesha256("${path.module}/playbooks/roles/slurm/templates/slurm-oci-notify-tmpfiles.conf.j2"),
+    filesha256("${path.module}/playbooks/roles/slurm/templates/systemd/slurm-oci-notify.path.j2"),
+    filesha256("${path.module}/playbooks/roles/slurm/templates/systemd/slurm-oci-notify.service.j2"),
+    filesha256("${path.module}/playbooks/roles/slurm/templates/systemd/slurm-oci-notify.timer.j2"),
+  ]))
+  slurm_notification_topic_id        = var.slurm_job_notifications_enabled ? (
+    oci_ons_notification_topic.slurm_local_user[0].id
+  ) : ""
+  slurm_notification_subscription_id = var.slurm_job_notifications_enabled ? (
+    oci_ons_subscription.slurm_local_user_email[0].id
+  ) : ""
+  slurm_notification_local_topic_suffix = substr(
+    sha256("${local.slurm_notification_cluster_scope}:${local.controller_username}"),
+    0,
+    12,
+  )
+  slurm_notification_controller_instance_ids = concat(
+    [oci_core_instance.controller.id],
+    oci_core_instance.backup[*].id,
+  )
+  slurm_notification_controller_matching_rule = length(local.slurm_notification_controller_instance_ids) == 1 ? "instance.id = '${local.slurm_notification_controller_instance_ids[0]}'" : format(
+    "Any {%s}",
+    join(", ", [for instance_id in local.slurm_notification_controller_instance_ids : "instance.id = '${instance_id}'"]),
+  )
 
   controller_image = local.use_imported_compute_image_for_controller ? local.image_ocid : (
     local.effective_use_marketplace_image_controller ? oci_core_app_catalog_subscription.controller_mp_image_subscription[0].listing_resource_id : local.custom_controller_image_ocid

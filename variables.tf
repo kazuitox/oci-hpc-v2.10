@@ -173,6 +173,23 @@ variable "ood_vnc_gpu_image_operating_system_version" {
 }
 variable "slurm" { default = true }
 variable "slurm_ha" { default = false }
+variable "slurm_job_notifications_enabled" {
+  type    = bool
+  default = false
+}
+variable "slurm_notification_admin_email" {
+  type      = string
+  default   = ""
+  sensitive = true
+
+  validation {
+    condition = (
+      trimspace(var.slurm_notification_admin_email) == "" ||
+      can(regex("^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,63}$", trimspace(var.slurm_notification_admin_email)))
+    )
+    error_message = "slurm_notification_admin_email must be empty or a valid email address."
+  }
+}
 variable "login_node" { default = false }
 variable "login_ad" {default = ""}
 variable "login_shape" { default = "VM.Standard.E5.Flex" }

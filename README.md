@@ -83,6 +83,8 @@ HPC_OL8
 | `private_deployment` | コントローラに Public IP を付与せず、Resource Manager Private Endpoint 経由で構成します。 |
 | `login_node` | ユーザー用の追加 Login Node を作成します。 |
 | `slurm_ha` | バックアップ Slurm Controller を作成します。 |
+| `slurm_job_notifications_enabled` | OCI Notifications を使った Slurm ジョブメール通知を有効化します。デフォルトは `false`。 |
+| `slurm_notification_admin_email` | ローカル Controller ユーザー（通常は `opc`）のジョブ通知先メールアドレス。 |
 | `use_ood` | Open OnDemand と OpenComposer をインストールします。 |
 | `ood_dcv_enabled` | 検証用のAmazon DCVデスクトップと専用の`dcv`パーティションを有効化します。 |
 | `ood_desktop_use_gpu` | VNCと、有効な場合はAmazon DCVのデスクトップノードにNVIDIA A10 GPUを使用します。 |
@@ -270,6 +272,50 @@ cluster user add <name> --nossh --gid 9876
 
 `--nossh` を指定すると、ノード間パスワードレス SSH 用のユーザー固有鍵を作成しません。
 
+Slurm ジョブメール通知が有効な場合、`cluster user add` はメールアドレスも入力します。コマンド自体を `sudo` で実行する必要はありません。非対話実行では `--email`（`-e`）を指定できます。
+
+```bash
+cluster user add <name> --email user@example.com
+cluster user delete <name>
+```
+
+追加時には LDAP の `mail` 属性、ユーザー専用の OCI Notifications Topic / EMAIL Subscription、通知レジストリをまとめて作成します。削除時には通知レジストリからユーザーを外した後、LDAP ユーザーと Subscription / Topic を削除します。OCI Notifications から届く確認メールは、受信者が承認する必要があります。OCI リソースの削除が一時的に失敗した場合は、復旧後に `cluster notification cleanup` を実行すると記録済みの削除処理を再試行できます。
+
+## Slurm ジョブメール通知
+
+スタック作成時に「Slurm ジョブメール通知を有効化」を選び、管理者メールアドレスを入力すると、次のリソースと設定を自動構成します。
+
+- primary Controller と、HA 構成では backup Controller だけを対象にした Dynamic Group
+- 対象 Compartment の Notifications Topic を操作するための IAM Policy
+- ローカル Controller ユーザー（通常は `opc`）用の Topic と EMAIL Subscription
+- Slurm `MailProg`、Controller 上の OCI CLI 配信ワーカー、再試行用 systemd unit
+
+初期 Subscription についても、管理者メールアドレスに届く OCI Notifications の確認メールを承認してください。ユーザーと Topic の対応は Controller の次のファイルで管理します。
+
+```text
+/opt/oci-hpc/conf/slurm_notification_users.json
+```
+
+ジョブスクリプトでは通常の Slurm オプションを指定します。宛先は実行 OS ユーザーから通知レジストリを参照して決めるため、`--mail-user` は不要です。
+
+```bash
+#SBATCH --mail-type=BEGIN,END,FAIL
+```
+
+Slurm の通知処理は OCI CLI を直接待たず、Controller 上のスプールへイベントを保存してから instance principal で OCI Notifications へ配信します。一時的な失敗は systemd timer が再試行し、通知処理の失敗によってジョブの開始・完了処理を失敗させません。OCI の EMAIL 配信制限を超えないよう最大10件/分に抑制し、配信不能ファイルは7日後に自動削除します。
+
+HA 構成では、LDAP ユーザーの追加・削除時に通知レジストリを backup Controller へ同期します。同期に失敗した場合は不整合を避けるため処理を安全に中断し、復旧後に primary Controller で次のコマンドを実行して再同期できます。
+
+```bash
+cluster notification sync
+```
+
+通知レジストリは両 Controller へ同期しますが、未配信イベントのスプールは各 Controller のローカル領域です。障害直前に active Controller に残った未配信イベントは、その Controller が復旧してワーカーが再開するまで配信されません。
+
+LDAP ユーザー用の Topic / Subscription は `cluster user add` が作成するため Terraform state には含まれません。通知機能の無効化またはスタック削除前に、対象 LDAP ユーザーを `cluster user delete` してこれらのリソースを削除してください。
+
+この機能を有効化するスタック実行者には、テナンシのホームリージョンで Dynamic Group と IAM Policy を作成できる権限、および対象 Compartment で Notifications Topic / Subscription を作成できる権限が必要です。新規 VCN の Service Gateway 経路、または既存ネットワークから OCI API への HTTPS 到達性も必要です。Instance Principal の権限は Controller インスタンス全体に付与されるため、Controller へのシェルアクセスは信頼できる利用者に限定し、通知リソースを配置する Compartment の分離も検討してください。
+
 ## 共有ホームディレクトリ
 
 デフォルトでは、コントローラが `/home` を NFS で全ノードに共有します。FSS を使う場合は、既存 FSS の IP / パスを指定するか、スタックで FSS を作成できます。
@@ -306,7 +352,7 @@ Amazon DCV側では、利用時間、初期解像度、同時接続数、ホー�
 
 ブラウザー接続はOODの`/rnode/<host>/<port>/`を経由します。Webクライアントの経路はHTTPS/WSS（TCP）であり、QUIC/UDPは使用しません。本機能は検証用です。本構成ではAmazon DCV Serverに別途ライセンスを設定しないため、インストール時に自動的に適用される自動評価ライセンスを使用します。自動評価ライセンスはインストール後30日間有効で、有効期限後はAmazon DCVセッションを新規作成またはホストできません。継続利用または本番利用には、利用者が適切なライセンスを用意し、[Amazon DCVのライセンス条件](https://docs.aws.amazon.com/dcv/latest/adminguide/setting-up-license.html)およびEULAを確認・遵守する必要があります。
 
-OpenComposer は `v2.0.2`（commit `7af3d94b36043d8019b1639cd8e463957eb7a37e`）に固定し、スタックの Slurm を直接利用するよう構成します。OpenComposer には、`queues.conf` のパーティションとノードグループ（Slurm Constraint）を選択できる汎用 Slurm ジョブフォームも追加します。Constraint の候補には各パーティションの `instance_types[].name`、つまり生成される `slurm.conf` の `NodeName` における `Features` の最後の値を使用します。パーティションを変更すると、そのパーティションで利用できる Constraint だけが選択肢として有効になります。実行プロファイル（MPI/Slurm）が `VM` の場合は `#SBATCH --ntasks-per-core=1` と `#SBATCH --exclusive`、`BM Standard` の場合は `#SBATCH --exclusive` のみをジョブスクリプトへ追加し、`BM HPC（RDMA）` ではどちらも追加しません。また、選択した実行プロファイルと MPI（`OpenMPI v4.x` または `Intel MPI(OneAPI)`）の組み合わせに対応する mpirun オプションを `export MPI_OPTIONS="..."` としてジョブスクリプトへ挿入します。実行時間の指定は有効・無効を選択でき、無効の場合は時間入力欄と `#SBATCH --time=` をジョブスクリプトから除外します。フォームで生成したジョブスクリプトは投入前に編集できます。Ruby の依存 gem には Open OnDemand 4.0 が同梱する gem セットを利用します。
+OpenComposer は `v2.0.2`（commit `7af3d94b36043d8019b1639cd8e463957eb7a37e`）に固定し、スタックの Slurm を直接利用するよう構成します。OpenComposer には、`queues.conf` のパーティションとノードグループ（Slurm Constraint）を選択できる汎用 Slurm ジョブフォームも追加します。Constraint の候補には各パーティションの `instance_types[].name`、つまり生成される `slurm.conf` の `NodeName` における `Features` の最後の値を使用します。パーティションを変更すると、そのパーティションで利用できる Constraint だけが選択肢として有効になります。実行プロファイル（MPI/Slurm）が `VM` の場合は `#SBATCH --ntasks-per-core=1` と `#SBATCH --exclusive`、`BM Standard` の場合は `#SBATCH --exclusive` のみをジョブスクリプトへ追加し、`BM HPC（RDMA）` ではどちらも追加しません。また、選択した実行プロファイルと MPI（`OpenMPI v4.x` または `Intel MPI(OneAPI)`）の組み合わせに対応する mpirun オプションを `export MPI_OPTIONS="..."` としてジョブスクリプトへ挿入します。実行時間の指定は有効・無効を選択でき、無効の場合は時間入力欄と `#SBATCH --time=` をジョブスクリプトから除外します。Slurm ジョブメール通知を有効化した場合は、メール通知の有無と `BEGIN` / `END` / `FAIL` をチェックボックスで選択でき、選択時だけ `#SBATCH --mail-type=` を生成します。フォームで生成したジョブスクリプトは投入前に編集できます。Ruby の依存 gem には Open OnDemand 4.0 が同梱する gem セットを利用します。
 
 デプロイ後に `/opt/oci-hpc/conf/queues.conf` のパーティションや `instance_types[].name` を変更した場合は、プライマリコントローラで `/opt/oci-hpc/bin/slurm_config.sh` を実行してください。Slurm 設定と OpenComposer のジョブフォームが同時に再生成されます。OpenComposer や Apache の再起動は不要で、ブラウザでジョブ作成画面を再読み込みすると変更が反映されます。OpenComposer v2.0.2 の動的フォームで安全に扱うため、パーティション名と `instance_types[].name` には英数字、ハイフン、アンダースコアだけを使用してください。
 

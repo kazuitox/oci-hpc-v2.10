@@ -12,6 +12,9 @@ SlurmdPidFile=/var/run/slurmd.pid
 SlurmdPort=6818
 SlurmdSpoolDir=/var/spool/slurmd
 SlurmUser=slurm
+{% if slurm_job_notifications_enabled | default(false) | bool %}
+MailProg=/usr/local/sbin/slurm-oci-mailprog
+{% endif %}
 {% if pyxis|bool or healthchecks|bool%}
 Prolog=/etc/slurm/prolog.d/*
 {% endif %}
