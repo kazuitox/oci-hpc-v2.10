@@ -15,6 +15,7 @@ import shlex
 import stat
 import subprocess
 import tempfile
+import time
 import uuid
 
 host = 'controller'
@@ -294,9 +295,48 @@ def _run_oci(config, arguments):
     raise NotificationError('Unable to execute OCI CLI: {}'.format(error)) from error
 
 
+def _notification_identifier_spec(resource_name):
+  specs = {
+    # NotificationTopic uses topic_id in the SDK, which the OCI CLI renders as
+    # topic-id.  Keep this strict so another OCID-shaped field cannot be
+    # mistaken for the Topic identifier.
+    'topic': (('topic-id',), 'ocid1.onstopic.'),
+    'subscription': (('id',), 'ocid1.onssubscription.'),
+  }
+  try:
+    return specs[resource_name]
+  except KeyError as error:
+    raise NotificationError(
+      "Unsupported notification resource type '{}'".format(resource_name)
+    ) from error
+
+
+def _notification_identifier_from_data(data, resource_name):
+  identifier_keys, identifier_prefix = _notification_identifier_spec(
+    resource_name
+  )
+  if not isinstance(data, dict):
+    return None
+  identifiers = {
+    data.get(key) for key in identifier_keys
+    if isinstance(data.get(key), str)
+    and data.get(key).startswith(identifier_prefix)
+  }
+  if len(identifiers) != 1:
+    return None
+  return identifiers.pop()
+
+
 def _oci_identifier(result, resource_name):
-  identifier = (result.stdout or '').strip()
-  if not identifier.startswith('ocid1.'):
+  try:
+    payload = json.loads(result.stdout or '')
+    data = payload.get('data')
+    identifier = _notification_identifier_from_data(data, resource_name)
+  except (AttributeError, TypeError, ValueError) as error:
+    raise NotificationError(
+      'OCI CLI did not return a valid {} OCID'.format(resource_name)
+    ) from error
+  if identifier is None:
     raise NotificationError(
       'OCI CLI did not return a valid {} OCID'.format(resource_name)
     )
@@ -312,27 +352,165 @@ def _delete_error_may_mean_absent(error):
 
 def _notification_resource_is_absent(config, resource_type, resource_id):
   """Confirm absence through an authorized compartment list operation."""
+  _, identifier_prefix = _notification_identifier_spec(
+    resource_type
+  )
   result = _run_oci(config, [
     'ons', resource_type, 'list',
     '--compartment-id', config['compartment_id'],
     '--all',
     '--output', 'json',
+    '--query', '@',
   ])
-  try:
-    payload = json.loads(result.stdout or '')
-    resources = payload.get('data')
-  except (AttributeError, TypeError, ValueError) as error:
+  output = (result.stdout or '').strip()
+  if not output:
+    resources = []
+  else:
+    try:
+      payload = json.loads(output)
+      resources = payload.get('data')
+    except (AttributeError, TypeError, ValueError) as error:
+      raise NotificationError(
+        'OCI CLI returned invalid {} list output'.format(resource_type)
+      ) from error
+    if not isinstance(resources, list):
+      raise NotificationError(
+        'OCI CLI returned invalid {} list output'.format(resource_type)
+      )
+  if (
+    not isinstance(resource_id, str)
+    or not resource_id.startswith(identifier_prefix)
+  ):
     raise NotificationError(
-      'OCI CLI returned invalid {} list output'.format(resource_type)
-    ) from error
-  if not isinstance(resources, list):
-    raise NotificationError(
-      'OCI CLI returned invalid {} list output'.format(resource_type)
+      'Invalid {} OCID for absence verification'.format(resource_type)
     )
-  return not any(
-    isinstance(resource, dict) and resource.get('id') == resource_id
-    for resource in resources
-  )
+  listed_ids = []
+  for resource in resources:
+    listed_id = _notification_identifier_from_data(resource, resource_type)
+    if listed_id is None:
+      raise NotificationError(
+        'OCI CLI returned invalid {} list output'.format(resource_type)
+      )
+    listed_ids.append(listed_id)
+  return resource_id not in listed_ids
+
+
+def _find_owned_notification_topic(config, topic_name, expected_tags):
+  """Find one unregistered Topic created by this exact provisioning attempt."""
+  topics = []
+  for attempt in range(3):
+    result = _run_oci(config, [
+      'ons', 'topic', 'list',
+      '--compartment-id', config['compartment_id'],
+      '--name', topic_name,
+      '--all',
+      '--output', 'json',
+      '--query', '@',
+    ])
+    output = (result.stdout or '').strip()
+    if not output:
+      # OCI CLI emits no JSON for a successfully listed empty collection.
+      topics = []
+    else:
+      try:
+        payload = json.loads(output)
+        topics = payload.get('data')
+      except (AttributeError, TypeError, ValueError) as error:
+        raise NotificationError(
+          'OCI CLI returned invalid topic list output during cleanup'
+        ) from error
+      if not isinstance(topics, list):
+        raise NotificationError(
+          'OCI CLI returned invalid topic list output during cleanup'
+        )
+    if topics or attempt == 2:
+      break
+    time.sleep(1)
+
+  registry = _load_notification_registry()
+  referenced_topic_ids = set()
+  for entry in registry.get('users', {}).values():
+    if not isinstance(entry, dict):
+      raise NotificationError('Invalid notification registry user entry')
+    referenced_topic_id = entry.get('topic_id')
+    if referenced_topic_id:
+      if not isinstance(referenced_topic_id, str):
+        raise NotificationError('Invalid Topic OCID in notification registry')
+      referenced_topic_ids.add(referenced_topic_id)
+
+  pending_cleanup = registry.get('config', {}).get('pending_cleanup', [])
+  if not isinstance(pending_cleanup, list):
+    raise NotificationError(
+      "Notification registry field 'pending_cleanup' must be a list"
+    )
+  for entry in pending_cleanup:
+    if not isinstance(entry, dict):
+      raise NotificationError('Invalid pending notification cleanup entry')
+    referenced_topic_id = entry.get('topic_id')
+    if referenced_topic_id:
+      if not isinstance(referenced_topic_id, str):
+        raise NotificationError(
+          'Invalid Topic OCID in pending notification cleanup'
+        )
+      referenced_topic_ids.add(referenced_topic_id)
+
+  matches = []
+  for topic in topics:
+    if not isinstance(topic, dict) or topic.get('name') != topic_name:
+      continue
+    if topic.get('compartment-id') != config['compartment_id']:
+      continue
+    if topic.get('lifecycle-state') not in ('ACTIVE', 'CREATING'):
+      continue
+    tags = topic.get('freeform-tags')
+    if not isinstance(tags, dict) or any(
+      tags.get(key) != value for key, value in expected_tags.items()
+    ):
+      continue
+    topic_id = _notification_identifier_from_data(topic, 'topic')
+    if topic_id is not None and topic_id not in referenced_topic_ids:
+      matches.append(topic_id)
+
+  if len(matches) != 1:
+    raise NotificationError(
+      'Expected exactly one owned Topic for cleanup, found {}'.format(
+        len(matches)
+      )
+    )
+  return matches[0]
+
+
+def _cleanup_topic_after_uncertain_creation(
+  config, user, email, topic_name, expected_tags
+):
+  """Delete a Topic only when this exact create attempt can be identified."""
+  cleanup_errors = []
+  try:
+    recovered_topic_id = _find_owned_notification_topic(
+      config, topic_name, expected_tags
+    )
+    cleanup_errors, remaining = _delete_notification_resources(
+      config,
+      {
+        'topic_id': recovered_topic_id,
+        'managed_by': 'cluster-cli',
+        'email': email,
+      },
+    )
+    if cleanup_errors:
+      try:
+        _record_pending_cleanup(user, remaining, cleanup_errors)
+      except NotificationError as record_error:
+        cleanup_errors.append(
+          'could not record pending cleanup: {}'.format(record_error)
+        )
+  except NotificationError as recovery_error:
+    cleanup_errors.append(
+      'could not identify created Topic for cleanup: {}'.format(
+        recovery_error
+      )
+    )
+  return cleanup_errors
 
 
 def _delete_notification_resources(config, entry):
@@ -493,26 +671,55 @@ def _commit_pending_cleanup_results(results):
 
 
 def _create_notification_resources(config, user, email):
+  provision_id = str(uuid.uuid4())
   tags = {
     'cluster_name': config['cluster_name'],
     'parent_cluster': config['cluster_name'],
     'notification_scope': config['cluster_scope_id'],
+    'notification_provision_id': provision_id,
     'slurm_user': user,
     'managed_by': 'cluster-cli',
   }
   serialized_tags = json.dumps(tags, separators=(',', ':'), sort_keys=True)
+  topic_name = _notification_topic_name(config, user)
   topic_id = None
   try:
-    topic_result = _run_oci(config, [
-      'ons', 'topic', 'create',
-      '--compartment-id', config['compartment_id'],
-      '--name', _notification_topic_name(config, user),
-      '--description', 'Slurm job notifications for {}'.format(user),
-      '--freeform-tags', serialized_tags,
-      '--query', 'data.id',
-      '--raw-output',
-    ])
-    topic_id = _oci_identifier(topic_result, 'topic')
+    try:
+      topic_result = _run_oci(config, [
+        'ons', 'topic', 'create',
+        '--compartment-id', config['compartment_id'],
+        '--name', topic_name,
+        '--description', 'Slurm job notifications for {}'.format(user),
+        '--freeform-tags', serialized_tags,
+        '--output', 'json',
+        '--query', '@',
+      ])
+    except NotificationError as create_error:
+      # A timeout is ambiguous: the service may have created the Topic even
+      # though the CLI could not return its response.  Other CLI/API errors do
+      # not justify a cleanup search because no create success is implied.
+      if not isinstance(create_error.__cause__, subprocess.TimeoutExpired):
+        raise
+      topic_error = create_error
+    else:
+      try:
+        topic_id = _oci_identifier(topic_result, 'topic')
+      except NotificationError as identifier_error:
+        topic_error = identifier_error
+      else:
+        topic_error = None
+
+    if topic_error is not None:
+      cleanup_errors = _cleanup_topic_after_uncertain_creation(
+        config, user, email, topic_name, tags
+      )
+      if cleanup_errors:
+        raise NotificationError(
+          '{}; cleanup also failed: {}'.format(
+            topic_error, '; '.join(cleanup_errors)
+          )
+        ) from topic_error
+      raise topic_error
 
     subscription_result = _run_oci(config, [
       'ons', 'subscription', 'create',
@@ -521,8 +728,8 @@ def _create_notification_resources(config, user, email):
       '--protocol', 'EMAIL',
       '--subscription-endpoint', email,
       '--freeform-tags', serialized_tags,
-      '--query', 'data.id',
-      '--raw-output',
+      '--output', 'json',
+      '--query', '@',
     ])
     subscription_id = _oci_identifier(subscription_result, 'subscription')
     return {

@@ -94,10 +94,50 @@ class ClusterCliNotificationTests(unittest.TestCase):
     @staticmethod
     def successful_oci(command, **kwargs):
         if command[:4] == ["oci", "ons", "topic", "create"]:
-            return SimpleNamespace(stdout="ocid1.onstopic.test\n", stderr="")
+            return SimpleNamespace(
+                stdout=json.dumps(
+                    {"data": {"topic-id": "ocid1.onstopic.test"}}
+                ),
+                stderr="",
+            )
         if command[:4] == ["oci", "ons", "subscription", "create"]:
-            return SimpleNamespace(stdout="ocid1.onssubscription.test\n", stderr="")
+            return SimpleNamespace(
+                stdout=json.dumps(
+                    {"data": {"id": "ocid1.onssubscription.test"}}
+                ),
+                stderr="",
+            )
         return SimpleNamespace(stdout="", stderr="")
+
+    def test_oci_identifier_extracts_resource_specific_keys_from_json(self):
+        topic_result = SimpleNamespace(
+            stdout=json.dumps(
+                {"data": {"topic-id": "ocid1.onstopic.test"}}
+            ),
+            stderr="",
+        )
+        subscription_result = SimpleNamespace(
+            stdout=json.dumps(
+                {"data": {"id": "ocid1.onssubscription.test"}}
+            ),
+            stderr="",
+        )
+
+        self.assertEqual(
+            self.module._oci_identifier(topic_result, "topic"),
+            "ocid1.onstopic.test",
+        )
+        self.assertEqual(
+            self.module._oci_identifier(subscription_result, "subscription"),
+            "ocid1.onssubscription.test",
+        )
+
+        wrong_topic_shape = SimpleNamespace(
+            stdout=json.dumps({"data": {"id": "ocid1.onstopic.wrong"}}),
+            stderr="",
+        )
+        with self.assertRaises(self.module.NotificationError):
+            self.module._oci_identifier(wrong_topic_shape, "topic")
 
     def test_enabled_add_creates_ons_resources_stores_mail_and_routes_user(self):
         self.write_registry(self.enabled_registry())
@@ -157,6 +197,12 @@ class ClusterCliNotificationTests(unittest.TestCase):
         self.assertEqual(
             commands[1][:4], ["oci", "ons", "subscription", "create"]
         )
+        for command in commands[:2]:
+            self.assertNotIn("--raw-output", command)
+            self.assertEqual(
+                command[command.index("--output") + 1], "json"
+            )
+            self.assertEqual(command[command.index("--query") + 1], "@")
         self.assertIn("--auth", commands[0])
         self.assertEqual(
             commands[0][commands[0].index("--auth") + 1], "instance_principal"
@@ -170,6 +216,462 @@ class ClusterCliNotificationTests(unittest.TestCase):
         self.assertEqual(tags["notification_scope"], "scope-1234")
         self.assertEqual(tags["slurm_user"], "alice")
         self.assertEqual(tags["managed_by"], "cluster-cli")
+        self.assertTrue(tags["notification_provision_id"])
+
+    def test_topic_absence_check_reads_topic_id_from_oci_json(self):
+        config = self.enabled_registry()["config"]
+        response = SimpleNamespace(
+            stdout=json.dumps(
+                {
+                    "data": [
+                        {
+                            "name": "owned-topic",
+                            "topic-id": "ocid1.onstopic.test",
+                        }
+                    ]
+                }
+            ),
+            stderr="",
+        )
+
+        with mock.patch.object(
+            self.module.subprocess, "run", return_value=response
+        ) as run:
+            absent = self.module._notification_resource_is_absent(
+                config, "topic", "ocid1.onstopic.test"
+            )
+
+        self.assertFalse(absent)
+        command = run.call_args.args[0]
+        self.assertEqual(command[:4], ["oci", "ons", "topic", "list"])
+        self.assertEqual(command[command.index("--output") + 1], "json")
+
+    def test_topic_absence_check_accepts_empty_successful_list_output(self):
+        config = self.enabled_registry()["config"]
+        response = SimpleNamespace(stdout="", stderr="")
+
+        with mock.patch.object(
+            self.module.subprocess, "run", return_value=response
+        ):
+            absent = self.module._notification_resource_is_absent(
+                config, "topic", "ocid1.onstopic.missing"
+            )
+
+        self.assertTrue(absent)
+
+    def test_topic_absence_check_rejects_list_entries_without_topic_id(self):
+        config = self.enabled_registry()["config"]
+        response = SimpleNamespace(
+            stdout=json.dumps({"data": [{"name": "malformed-topic"}]}),
+            stderr="",
+        )
+
+        with mock.patch.object(
+            self.module.subprocess, "run", return_value=response
+        ):
+            with self.assertRaises(self.module.NotificationError):
+                self.module._notification_resource_is_absent(
+                    config, "topic", "ocid1.onstopic.missing"
+                )
+
+    def test_topic_parse_failure_recovers_owned_orphan_and_cleans_it_up(self):
+        self.write_registry(self.enabled_registry())
+        config = self.enabled_registry()["config"]
+        topic_name = self.module._notification_topic_name(config, "alice")
+        topic_id = "ocid1.onstopic.orphan"
+        create_tags = {}
+
+        def malformed_create_with_owned_orphan(command, **kwargs):
+            if command[:4] == ["oci", "ons", "topic", "create"]:
+                create_tags.update(
+                    json.loads(
+                        command[command.index("--freeform-tags") + 1]
+                    )
+                )
+                return SimpleNamespace(stdout="not-json", stderr="")
+            if command[:4] == ["oci", "ons", "topic", "list"]:
+                return SimpleNamespace(
+                    stdout=json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "name": topic_name,
+                                    "topic-id": topic_id,
+                                    "compartment-id": "ocid1.compartment.test",
+                                    "lifecycle-state": "ACTIVE",
+                                    "freeform-tags": create_tags,
+                                }
+                            ]
+                        }
+                    ),
+                    stderr="",
+                )
+            if command[:4] == ["oci", "ons", "topic", "delete"]:
+                return SimpleNamespace(stdout="", stderr="")
+            self.fail("unexpected command: {!r}".format(command))
+
+        with mock.patch.object(
+            self.module, "_create_ldap_user"
+        ) as create_ldap_user:
+            with mock.patch.object(
+                self.module.subprocess,
+                "run",
+                side_effect=malformed_create_with_owned_orphan,
+            ) as run:
+                result = self.runner.invoke(
+                    self.module.main,
+                    [
+                        "user",
+                        "add",
+                        "alice",
+                        "--password",
+                        "secret",
+                        "--name",
+                        "Alice Example",
+                        "--uid",
+                        "10101",
+                        "--email",
+                        "alice@example.com",
+                        "--nossh",
+                    ],
+                )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn(
+            "Unable to create OCI notification resources", result.output
+        )
+        create_ldap_user.assert_not_called()
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(
+            [command[:4] for command in commands],
+            [
+                ["oci", "ons", "topic", "create"],
+                ["oci", "ons", "topic", "list"],
+                ["oci", "ons", "topic", "delete"],
+            ],
+        )
+        self.assertEqual(
+            commands[1][commands[1].index("--name") + 1], topic_name
+        )
+        self.assertEqual(
+            commands[2][commands[2].index("--topic-id") + 1], topic_id
+        )
+        registry = self.read_registry()
+        self.assertEqual(registry["users"], {})
+        self.assertNotIn("pending_cleanup", registry["config"])
+
+    def test_topic_create_timeout_recovers_provisioned_topic_without_ldap(self):
+        self.write_registry(self.enabled_registry())
+        config = self.enabled_registry()["config"]
+        topic_name = self.module._notification_topic_name(config, "alice")
+        topic_id = "ocid1.onstopic.timedout"
+        create_tags = {}
+
+        def timed_out_create_with_provisioned_topic(command, **kwargs):
+            if command[:4] == ["oci", "ons", "topic", "create"]:
+                create_tags.update(
+                    json.loads(
+                        command[command.index("--freeform-tags") + 1]
+                    )
+                )
+                raise self.module.subprocess.TimeoutExpired(command, 120)
+            if command[:4] == ["oci", "ons", "topic", "list"]:
+                return SimpleNamespace(
+                    stdout=json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "name": topic_name,
+                                    "topic-id": topic_id,
+                                    "compartment-id": "ocid1.compartment.test",
+                                    "lifecycle-state": "ACTIVE",
+                                    "freeform-tags": create_tags,
+                                }
+                            ]
+                        }
+                    ),
+                    stderr="",
+                )
+            if command[:4] == ["oci", "ons", "topic", "delete"]:
+                return SimpleNamespace(stdout="", stderr="")
+            self.fail("unexpected command: {!r}".format(command))
+
+        with mock.patch.object(
+            self.module, "_create_ldap_user"
+        ) as create_ldap_user:
+            with mock.patch.object(
+                self.module.subprocess,
+                "run",
+                side_effect=timed_out_create_with_provisioned_topic,
+            ) as run:
+                result = self.runner.invoke(
+                    self.module.main,
+                    [
+                        "user",
+                        "add",
+                        "alice",
+                        "--password",
+                        "secret",
+                        "--name",
+                        "Alice Example",
+                        "--uid",
+                        "10101",
+                        "--gid",
+                        "9876",
+                        "--email",
+                        "alice@example.com",
+                        "--nossh",
+                    ],
+                )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("OCI CLI timed out after 120 seconds", result.output)
+        self.assertTrue(create_tags["notification_provision_id"])
+        create_ldap_user.assert_not_called()
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(
+            [command[:4] for command in commands],
+            [
+                ["oci", "ons", "topic", "create"],
+                ["oci", "ons", "topic", "list"],
+                ["oci", "ons", "topic", "delete"],
+            ],
+        )
+        self.assertEqual(
+            commands[2][commands[2].index("--topic-id") + 1], topic_id
+        )
+        registry = self.read_registry()
+        self.assertEqual(registry["users"], {})
+        self.assertNotIn("pending_cleanup", registry["config"])
+
+    def test_uncertain_topic_cleanup_retries_empty_list_then_deletes(self):
+        self.write_registry(self.enabled_registry())
+        config = self.enabled_registry()["config"]
+        topic_name = self.module._notification_topic_name(config, "alice")
+        topic_id = "ocid1.onstopic.eventuallyvisible"
+        expected_tags = {
+            "cluster_name": "trial-cluster",
+            "parent_cluster": "trial-cluster",
+            "notification_scope": "scope-1234",
+            "notification_provision_id": "provision-attempt-1",
+            "slurm_user": "alice",
+            "managed_by": "cluster-cli",
+        }
+        list_attempts = []
+
+        def eventually_consistent_topic_list(command, **kwargs):
+            if command[:4] == ["oci", "ons", "topic", "list"]:
+                list_attempts.append(command)
+                if len(list_attempts) < 3:
+                    return SimpleNamespace(stdout="", stderr="")
+                return SimpleNamespace(
+                    stdout=json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "name": topic_name,
+                                    "topic-id": topic_id,
+                                    "compartment-id": "ocid1.compartment.test",
+                                    "lifecycle-state": "CREATING",
+                                    "freeform-tags": expected_tags,
+                                }
+                            ]
+                        }
+                    ),
+                    stderr="",
+                )
+            if command[:4] == ["oci", "ons", "topic", "delete"]:
+                return SimpleNamespace(stdout="", stderr="")
+            self.fail("unexpected command: {!r}".format(command))
+
+        with mock.patch.object(
+            self.module.subprocess,
+            "run",
+            side_effect=eventually_consistent_topic_list,
+        ) as run:
+            with mock.patch.object(self.module.time, "sleep") as sleep:
+                cleanup_errors = (
+                    self.module._cleanup_topic_after_uncertain_creation(
+                        config,
+                        "alice",
+                        "alice@example.com",
+                        topic_name,
+                        expected_tags,
+                    )
+                )
+
+        self.assertEqual(cleanup_errors, [])
+        self.assertEqual(len(list_attempts), 3)
+        self.assertEqual(sleep.call_args_list, [mock.call(1), mock.call(1)])
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(
+            [command[:4] for command in commands],
+            [
+                ["oci", "ons", "topic", "list"],
+                ["oci", "ons", "topic", "list"],
+                ["oci", "ons", "topic", "list"],
+                ["oci", "ons", "topic", "delete"],
+            ],
+        )
+        self.assertEqual(
+            commands[-1][commands[-1].index("--topic-id") + 1], topic_id
+        )
+
+    def test_topic_parse_failure_does_not_delete_unowned_candidate(self):
+        self.write_registry(self.enabled_registry())
+        config = self.enabled_registry()["config"]
+        topic_name = self.module._notification_topic_name(config, "alice")
+        create_tags = {}
+
+        def malformed_create_with_unowned_candidate(command, **kwargs):
+            if command[:4] == ["oci", "ons", "topic", "create"]:
+                create_tags.update(
+                    json.loads(
+                        command[command.index("--freeform-tags") + 1]
+                    )
+                )
+                return SimpleNamespace(stdout="not-json", stderr="")
+            if command[:4] == ["oci", "ons", "topic", "list"]:
+                foreign_tags = dict(create_tags)
+                foreign_tags["notification_scope"] = "another-scope"
+                return SimpleNamespace(
+                    stdout=json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "name": topic_name,
+                                    "topic-id": "ocid1.onstopic.foreign",
+                                    "compartment-id": "ocid1.compartment.test",
+                                    "lifecycle-state": "ACTIVE",
+                                    "freeform-tags": foreign_tags,
+                                }
+                            ]
+                        }
+                    ),
+                    stderr="",
+                )
+            self.fail("unexpected command: {!r}".format(command))
+
+        with mock.patch.object(
+            self.module, "_create_ldap_user"
+        ) as create_ldap_user:
+            with mock.patch.object(
+                self.module.subprocess,
+                "run",
+                side_effect=malformed_create_with_unowned_candidate,
+            ) as run:
+                result = self.runner.invoke(
+                    self.module.main,
+                    [
+                        "user",
+                        "add",
+                        "alice",
+                        "--password",
+                        "secret",
+                        "--name",
+                        "Alice Example",
+                        "--uid",
+                        "10101",
+                        "--email",
+                        "alice@example.com",
+                        "--nossh",
+                    ],
+                )
+
+        self.assertNotEqual(result.exit_code, 0)
+        create_ldap_user.assert_not_called()
+        self.assertEqual(
+            [call.args[0][:4] for call in run.call_args_list],
+            [
+                ["oci", "ons", "topic", "create"],
+                ["oci", "ons", "topic", "list"],
+            ],
+        )
+        registry = self.read_registry()
+        self.assertEqual(registry["users"], {})
+        self.assertNotIn("pending_cleanup", registry["config"])
+
+    def test_topic_parse_failure_journals_recovered_orphan_when_cleanup_fails(self):
+        self.write_registry(self.enabled_registry())
+        config = self.enabled_registry()["config"]
+        topic_name = self.module._notification_topic_name(config, "alice")
+        topic_id = "ocid1.onstopic.orphan"
+        create_tags = {}
+
+        def cleanup_of_recovered_orphan_fails(command, **kwargs):
+            if command[:4] == ["oci", "ons", "topic", "create"]:
+                create_tags.update(
+                    json.loads(
+                        command[command.index("--freeform-tags") + 1]
+                    )
+                )
+                return SimpleNamespace(stdout="not-json", stderr="")
+            if command[:4] == ["oci", "ons", "topic", "list"]:
+                return SimpleNamespace(
+                    stdout=json.dumps(
+                        {
+                            "data": [
+                                {
+                                    "name": topic_name,
+                                    "topic-id": topic_id,
+                                    "compartment-id": "ocid1.compartment.test",
+                                    "lifecycle-state": "ACTIVE",
+                                    "freeform-tags": create_tags,
+                                }
+                            ]
+                        }
+                    ),
+                    stderr="",
+                )
+            if command[:4] == ["oci", "ons", "topic", "delete"]:
+                raise self.module.subprocess.CalledProcessError(
+                    1, command, stderr="topic temporarily unavailable"
+                )
+            self.fail("unexpected command: {!r}".format(command))
+
+        with mock.patch.object(
+            self.module, "_create_ldap_user"
+        ) as create_ldap_user:
+            with mock.patch.object(
+                self.module.subprocess,
+                "run",
+                side_effect=cleanup_of_recovered_orphan_fails,
+            ) as run:
+                result = self.runner.invoke(
+                    self.module.main,
+                    [
+                        "user",
+                        "add",
+                        "alice",
+                        "--password",
+                        "secret",
+                        "--name",
+                        "Alice Example",
+                        "--uid",
+                        "10101",
+                        "--email",
+                        "alice@example.com",
+                        "--nossh",
+                    ],
+                )
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("cleanup also failed", result.output)
+        create_ldap_user.assert_not_called()
+        self.assertEqual(
+            [call.args[0][:4] for call in run.call_args_list],
+            [
+                ["oci", "ons", "topic", "create"],
+                ["oci", "ons", "topic", "list"],
+                ["oci", "ons", "topic", "delete"],
+            ],
+        )
+        pending = self.read_registry()["config"]["pending_cleanup"]
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0]["username"], "alice")
+        self.assertEqual(pending[0]["topic_id"], topic_id)
+        self.assertEqual(pending[0]["subscription_id"], "")
+        self.assertIn("topic temporarily unavailable", pending[0]["errors"][0])
 
     def test_ldap_user_creation_stores_mail_attribute(self):
         connection = mock.MagicMock()
