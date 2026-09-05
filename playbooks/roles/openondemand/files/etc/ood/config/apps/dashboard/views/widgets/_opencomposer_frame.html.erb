@@ -1,0 +1,69 @@
+<%
+  frame_id = "opencomposer-frame-#{path.to_s.gsub(/[^a-zA-Z0-9_-]/, '-')}"
+%>
+
+<section class="opencomposer-page-frame" aria-label="<%= title %>">
+  <iframe
+    id="<%= frame_id %>"
+    class="opencomposer-frame"
+    src="<%= path %>"
+    title="<%= title %>"
+  ></iframe>
+</section>
+
+<style nonce="<%= content_security_policy_nonce %>">
+  body.opencomposer-custom-page #main_container {
+    margin-top: 0.75rem !important;
+    max-width: none;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .opencomposer-page-frame {
+    width: 100%;
+  }
+
+  .opencomposer-frame {
+    border: 0;
+    height: calc(100vh - 6.5rem);
+    min-height: 600px;
+    visibility: hidden;
+    width: 100%;
+  }
+</style>
+
+<script nonce="<%= content_security_policy_nonce %>">
+  (() => {
+    document.body.classList.add("opencomposer-custom-page");
+
+    const frame = document.getElementById(<%= frame_id.to_json %>);
+    if (!frame) return;
+
+    const prepareFrame = () => {
+      try {
+        const frameDocument = frame.contentDocument;
+        const openComposerNav = frameDocument && frameDocument.querySelector("#_form_container > nav");
+        if (openComposerNav) openComposerNav.hidden = true;
+      } catch (_error) {
+        // The OpenComposer page is expected to be same-origin. If that changes,
+        // leave its navigation intact and still make the page usable.
+      } finally {
+        frame.style.visibility = "visible";
+      }
+    };
+
+    frame.addEventListener("load", prepareFrame);
+
+    try {
+      if (
+        frame.contentDocument &&
+        frame.contentDocument.readyState === "complete" &&
+        frame.contentWindow.location.href !== "about:blank"
+      ) {
+        prepareFrame();
+      }
+    } catch (_error) {
+      frame.style.visibility = "visible";
+    }
+  })();
+</script>

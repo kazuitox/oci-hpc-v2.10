@@ -7,6 +7,7 @@
   loop:
     - ondemand.d
     - locales
+    - apps/dashboard/views/widgets
 
 - name: OpenOnDemand dashboard | Render dashboard configuration
   ansible.builtin.template:
@@ -15,6 +16,7 @@
     owner: root
     group: root
     mode: "0644"
+  register: ood_dashboard_configuration
 
 - name: OpenOnDemand dashboard | Install locale override
   ansible.builtin.copy:
@@ -41,6 +43,46 @@
     owner: root
     group: root
     mode: "0644"
+
+- name: OpenOnDemand dashboard | Install the shared OpenComposer frame widget
+  ansible.builtin.copy:
+    src: etc/ood/config/apps/dashboard/views/widgets/_opencomposer_frame.html.erb
+    dest: /etc/ood/config/apps/dashboard/views/widgets/_opencomposer_frame.html.erb
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_opencomposer_frame_widget
+
+- name: OpenOnDemand dashboard | Render OpenComposer endpoint widgets
+  ansible.builtin.template:
+    src: opencomposer_dashboard_widget.html.erb.j2
+    dest: "/etc/ood/config/apps/dashboard/views/widgets/_opencomposer_{{ item.name }}.html.erb"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    opencomposer_widget_title: "{{ item.title }}"
+    opencomposer_widget_endpoint: "{{ item.endpoint }}"
+  loop:
+    - name: slurm
+      title: Slurmジョブ
+      endpoint: slurm
+    - name: history
+      title: History
+      endpoint: history
+  register: ood_opencomposer_endpoint_widgets
+
+- name: OpenOnDemand dashboard | Request a Passenger restart after widget changes
+  ansible.builtin.file:
+    path: /var/www/ood/apps/sys/dashboard/tmp/restart.txt
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+  when: >-
+    ood_dashboard_configuration.changed
+    or ood_opencomposer_frame_widget.changed
+    or ood_opencomposer_endpoint_widgets.changed
 
 - name: OpenOnDemand dashboard | Ensure system app override directories exist
   ansible.builtin.file:
