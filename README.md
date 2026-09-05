@@ -352,6 +352,8 @@ Destroy 開始後は `cluster user add` など、通知リソースを新しく�
 
 `use_ood` を有効にすると、Open OnDemand と [OpenComposer](https://github.com/RIKEN-RCCS/OpenComposer) をインストールします。ユーザーはブラウザからファイル操作、ジョブ投入、アプリケーション実行を行えます。スタックは Open OnDemand 用の初期パスワードも生成し、構成に反映します。
 
+ブラウザシェルの無操作タイムアウトは30分です。接続の最大継続時間はOpen OnDemandのデフォルトである1時間のままです。
+
 `use_ood`を有効にするとVNC用の`vnc`パーティション（Constraint: `dskv`、instance keyword: `desktop-v`）を作成します。Oracle Linux 8で`ood_dcv_enabled`も有効にすると、DCV専用の`dcv`パーティション（Constraint: `dskd`、instance keyword: `desktop-d`）と「Linux Desktop with Amazon DCV（検証用）」を追加します。VNCジョブは`vnc`、DCVジョブは`dcv`へ投入され、ノード構築時のAnsibleもキュー名に応じてTurboVNCまたはAmazon DCVだけを構成します。
 
 `ood_desktop_use_gpu`の初期値は`false`で、VNCとDCVは`VM.Standard.E6.Flex`のCPUデスクトップノードを使用します。CPUノードではAnsibleが`Server with GUI`パッケージグループをインストールし、DCV仮想セッションはソフトウェア描画を使用します。`ood_desktop_use_gpu`を有効にすると、VNCとDCVの両方が`VM.GPU.A10.1`とGUI導入済みのGPUデスクトップ用Custom Imageを使用します。GPUノードではGUIの再インストールをスキップし、GDMのWayland無効化、NVIDIA Xorg `:0`、DCV-GL、VirtualGLを構成します。
