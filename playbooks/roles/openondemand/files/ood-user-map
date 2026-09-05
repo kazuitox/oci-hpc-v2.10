@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -o nounset
+
+if [[ $# -ne 1 ]]; then
+  exit 1
+fi
+
+remote_user=${1//+/ }
+printf -v remote_user '%b' "${remote_user//%/\\x}" 2>/dev/null || exit 1
+system_user=${remote_user%%@*}
+
+if [[ ! $system_user =~ ^[a-zA-Z_][a-zA-Z0-9_.-]*$ ]]; then
+  exit 1
+fi
+
+getent passwd "$system_user" >/dev/null || exit 1
+printf '%s\n' "$system_user"

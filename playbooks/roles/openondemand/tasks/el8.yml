@@ -294,6 +294,14 @@
           For static login, set ood_opc_password or ood_dex_static_hash.
           For non-anonymous LDAP bind, set ood_ldap_bind_dn and ood_ldap_bind_pw.
 
+    - name: OpenOnDemand | Install user mapper
+      ansible.builtin.copy:
+        src: ood-user-map
+        dest: "{{ ood_user_map_cmd }}"
+        owner: root
+        group: root
+        mode: "0755"
+
     - name: Deploy ood_portal.yml for Dex login
       ansible.builtin.template:
         src: ood_portal.yml.j2
