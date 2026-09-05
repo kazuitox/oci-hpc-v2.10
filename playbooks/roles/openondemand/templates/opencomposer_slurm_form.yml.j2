@@ -31,8 +31,8 @@ form:
     value: {{ 'なし' | to_json }}
     options:
       - [{{ 'なし' | to_json }}, {{ ['', '', ''] | to_json }}]
-      - [{{ 'MPI' | to_json }}, {{ ['', '', ''] | to_json }}, {{ 'enable-mpi_profile' | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}, {{ 'enable-mpi_vm' | to_json }}, {{ 'enable-mpi_bm_standard' | to_json }}]
-      - [{{ 'OpenMP' | to_json }}, {{ ['export OMP_NUM_THREADS=', 'export OMP_PROC_BIND=close', 'export OMP_DISPLAY_AFFINITY=TRUE'] | to_json }}]
+      - [{{ 'MPI' | to_json }}, {{ ['', '', ''] | to_json }}, {{ 'enable-mpi_profile' | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}, {{ 'enable-mpi_vm' | to_json }}, {{ 'enable-mpi_bm_standard' | to_json }}, {{ 'enable-tasks_per_node' | to_json }}]
+      - [{{ 'OpenMP' | to_json }}, {{ ['export OMP_NUM_THREADS=', 'export OMP_PROC_BIND=close', 'export OMP_DISPLAY_AFFINITY=TRUE'] | to_json }}, {{ 'enable-cpus_per_task' | to_json }}]
     required: true
     help: 並列実行方式を選択します。MPIを選択すると実行環境とMPI実装を指定できます。
 
@@ -90,7 +90,14 @@ form:
 
   tasks_per_node:
     widget: number
-    label: ノードあたりのタスク数
+    label: ノードあたりのタスク数（--ntasks-per-node）
+    value: 1
+    min: 1
+    required: true
+
+  cpus_per_task:
+    widget: number
+    label: 1タスクに割り当てるCPU数（--cpus-per-task）
     value: 1
     min: 1
     required: true
@@ -149,6 +156,7 @@ script: |
   #SBATCH #{mpi_profile_2}
   #SBATCH --nodes=#{nodes}
   #SBATCH --ntasks-per-node=#{tasks_per_node}
+  #SBATCH --cpus-per-task=#{cpus_per_task}
   #{walltime_enabled}#{walltime_1}:#{walltime_2}:00
 {% if slurm_job_notifications_enabled | default(false) | bool %}  #SBATCH --mail-type=#{mail_notification_types}
 {% endif %}

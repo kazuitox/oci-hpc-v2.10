@@ -45,6 +45,35 @@ class OpenComposerExecutionProfileTests(unittest.TestCase):
         ):
             self.assertIn("enable-" + mpi_widget, body)
 
+    def test_parallelism_fields_follow_the_execution_profile(self):
+        profile_body = self.widget_body("execution_profile", "mpi_profile")
+        mpi_option = next(
+            line
+            for line in profile_body.splitlines()
+            if "{{ 'MPI' | to_json }}" in line
+        )
+        openmp_option = next(
+            line
+            for line in profile_body.splitlines()
+            if "{{ 'OpenMP' | to_json }}" in line
+        )
+
+        self.assertIn("enable-tasks_per_node", mpi_option)
+        self.assertNotIn("enable-cpus_per_task", mpi_option)
+        self.assertIn("enable-cpus_per_task", openmp_option)
+        self.assertNotIn("enable-tasks_per_node", openmp_option)
+
+        tasks_body = self.widget_body("tasks_per_node", "cpus_per_task")
+        cpus_body = self.widget_body("cpus_per_task", "walltime_enabled")
+        self.assertIn(
+            "label: ノードあたりのタスク数（--ntasks-per-node）", tasks_body
+        )
+        self.assertIn(
+            "label: 1タスクに割り当てるCPU数（--cpus-per-task）", cpus_body
+        )
+        self.assertIn("#SBATCH --ntasks-per-node=#{tasks_per_node}", self.template)
+        self.assertIn("#SBATCH --cpus-per-task=#{cpus_per_task}", self.template)
+
     def test_mpi_profile_has_three_execution_environments(self):
         body = self.widget_body("mpi_profile", "mpi_bm_hpc")
 
