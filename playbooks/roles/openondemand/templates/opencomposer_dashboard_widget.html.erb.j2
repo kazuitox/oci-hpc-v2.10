@@ -1,0 +1,4 @@
+<%= render partial: "widgets/opencomposer_frame", locals: {
+  title: {{ opencomposer_widget_title | to_json }},
+  path: {{ ('/pun/sys/' ~ (ood_opencomposer_install_dir | basename) ~ '/' ~ opencomposer_widget_endpoint) | to_json }}
+} %>

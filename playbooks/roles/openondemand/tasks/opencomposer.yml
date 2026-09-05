@@ -25,6 +25,23 @@
     mode: "0644"
   register: ood_opencomposer_dashboard_manifest
 
+- name: OpenComposer | Create the History dashboard link directory
+  ansible.builtin.file:
+    path: "{{ ood_opencomposer_history_link_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: OpenComposer | Configure the History dashboard manifest
+  ansible.builtin.template:
+    src: opencomposer_history_manifest.yml.j2
+    dest: "{{ ood_opencomposer_history_link_dir }}/manifest.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_opencomposer_history_manifest
+
 - name: OpenComposer | Set system app directory permissions
   ansible.builtin.file:
     path: "{{ ood_opencomposer_install_dir }}"
@@ -84,6 +101,7 @@
   when: >-
     ood_opencomposer_checkout.changed
     or ood_opencomposer_dashboard_manifest.changed
+    or ood_opencomposer_history_manifest.changed
     or ood_opencomposer_permissions.changed
     or ood_opencomposer_config.changed
     or ood_opencomposer_manifest.changed

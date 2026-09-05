@@ -6,6 +6,8 @@
 
 ### Added
 
+- Open OnDemandに「04 OpenComposer」メニューを追加し、「Slurmジョブ」と「History」をOpen OnDemandのヘッダー内で利用できるようにしました。
+- OpenComposerの実行プロファイルを非MPI、MPI、OpenMPで切り替えられるようにし、Platform MPI v9.xとプロファイル別のCPU・タスク数指定を追加しました。
 - Slurmの`BEGIN` / `END` / `FAIL`イベントをOCI Notifications経由でメール送信する機能を追加しました。
 - OpenComposerのジョブフォームにメール通知の有効化と通知タイミングの選択項目を追加しました。
 - LDAPユーザーの追加・削除と連動してNotifications Topic / Subscriptionおよび通知レジストリを管理できるようにしました。

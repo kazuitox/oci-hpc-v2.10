@@ -25,34 +25,61 @@ form:
     help: ジョブを実行するSlurmノードグループを選択します。
 
 {% endfor %}
-  mpi_shape:
+  execution_profile:
     widget: select
-    label: 実行プロファイル（MPI/Slurm）
-    value: {{ 'BM HPC（RDMA）' | to_json }}
+    label: 実行プロファイル
+    value: {{ 'なし' | to_json }}
     options:
-      - [{{ 'BM HPC（RDMA）' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
-      - [{{ 'VM' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
-      - [{{ 'BM Standard' | to_json }}, {{ ['', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'なし' | to_json }}, {{ ['', '', ''] | to_json }}]
+      - [{{ 'MPI' | to_json }}, {{ ['', '', ''] | to_json }}, {{ 'enable-mpi_profile' | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}, {{ 'enable-mpi_vm' | to_json }}, {{ 'enable-mpi_bm_standard' | to_json }}, {{ 'enable-tasks_per_node' | to_json }}]
+      - [{{ 'OpenMP' | to_json }}, {{ ['export OMP_NUM_THREADS=', 'export OMP_PROC_BIND=close', 'export OMP_DISPLAY_AFFINITY=TRUE'] | to_json }}, {{ 'enable-cpus_per_task' | to_json }}]
     required: true
-    help: ハードウェアに対応するMPIおよびSlurm設定を選択します。
+    help: 並列実行方式を選択します。MPIを選択すると実行環境とMPI実装を指定できます。
+
+  mpi_profile:
+    widget: select
+    label: MPI実行環境
+    value: {{ 'BM HPC (RDMA)' | to_json }}
+    options:
+      - [{{ 'BM HPC (RDMA)' | to_json }}, {{ ['', ''] | to_json }}, {{ 'enable-mpi_bm_hpc' | to_json }}]
+      - [{{ 'VM (TCP)' | to_json }}, {{ ['--ntasks-per-core=1', '--exclusive'] | to_json }}, {{ 'enable-mpi_vm' | to_json }}]
+      - [{{ 'BM Standard (TCP)' | to_json }}, {{ ['', '--exclusive'] | to_json }}, {{ 'enable-mpi_bm_standard' | to_json }}]
+    required: true
+    indent: 1
+    help: MPI通信方式に対応するハードウェアプロファイルを選択します。
 
   mpi_bm_hpc:
     widget: select
     label: MPI
     value: {{ 'OpenMPI v4.x' | to_json }}
     options:
+      - [{{ 'Intel MPI (OneAPI)' | to_json }}, {{ '-genv UCX_TLS=rc,self,sm -genv UCX_NET_DEVICES=mlx5_2:1 -genv I_MPI_FABRICS=shm:ofi -genv I_MPI_DEBUG=5' | to_json }}]
       - [{{ 'OpenMPI v4.x' | to_json }}, {{ '--report-bindings -mca pml ucx -mca coll_hcoll_enable 0 -x UCX_TLS=rc,self,sm -x UCX_NET_DEVICES=mlx5_2:1 -x UCX_IB_TRAFFIC_CLASS=105 -x UCX_IB_GID_INDEX=3 -x HCOLL_ENABLE_MCAST_ALL=0' | to_json }}]
-      - [{{ 'Intel MPI(OneAPI)' | to_json }}, {{ '-genv UCX_TLS=rc,self,sm -genv UCX_NET_DEVICES=mlx5_2:1 -genv I_MPI_FABRICS=shm:ofi -genv I_MPI_DEBUG=5' | to_json }}]
+      - [{{ 'Platform MPI v9.x' | to_json }}, {{ '-intra=shm -e MPI_HASIC_UDAPL=ofa-v2-cma-roe-ens800f0np0 -UDAPL -e MPI_FLAGS=y  -d -v -prot' | to_json }}]
     required: true
+    indent: 2
 
   mpi_vm:
     widget: select
     label: MPI
     value: {{ 'OpenMPI v4.x' | to_json }}
     options:
+      - [{{ 'Intel MPI (OneAPI)' | to_json }}, {{ '-genv I_MPI_FABRICS=shm:ofi -genv I_MPI_OFI_PROVIDER=tcp -genv I_MPI_DEBUG=5' | to_json }}]
       - [{{ 'OpenMPI v4.x' | to_json }}, {{ '--report-bindings --mca btl self,tcp --mca coll_hcoll_enable 0 --bind-to core' | to_json }}]
-      - [{{ 'Intel MPI(OneAPI)' | to_json }}, {{ '-genv I_MPI_FABRICS=shm:ofi -genv I_MPI_OFI_PROVIDER=tcp -genv I_MPI_DEBUG=5' | to_json }}]
+      - [{{ 'Platform MPI v9.x' | to_json }}, {{ '-intra=shm -TCP -e MPI_FLAGS=y  -d -v -prot' | to_json }}]
     required: true
+    indent: 2
+
+  mpi_bm_standard:
+    widget: select
+    label: MPI
+    value: {{ 'OpenMPI v4.x' | to_json }}
+    options:
+      - [{{ 'Intel MPI (OneAPI)' | to_json }}, {{ '-genv I_MPI_FABRICS=shm:ofi -genv I_MPI_OFI_PROVIDER=tcp -genv I_MPI_DEBUG=5' | to_json }}]
+      - [{{ 'OpenMPI v4.x' | to_json }}, {{ '--report-bindings --mca btl self,tcp --mca coll_hcoll_enable 0 --bind-to core' | to_json }}]
+      - [{{ 'Platform MPI v9.x' | to_json }}, {{ '-intra=shm -TCP -e MPI_FLAGS=y  -d -v -prot' | to_json }}]
+    required: true
+    indent: 2
 
   nodes:
     widget: number
@@ -63,7 +90,14 @@ form:
 
   tasks_per_node:
     widget: number
-    label: ノードあたりのタスク数
+    label: ノードあたりのタスク数（--ntasks-per-node）
+    value: 1
+    min: 1
+    required: true
+
+  cpus_per_task:
+    widget: number
+    label: 1タスクに割り当てるCPU数（--cpus-per-task）
     value: 1
     min: 1
     required: true
@@ -118,15 +152,21 @@ script: |
   #!/bin/bash
   #SBATCH --partition=#{partition}
 {% for partition in queues %}  #SBATCH --constraint=#{constraint_p{{ loop.index }}}
-{% endfor %}  #SBATCH #{mpi_shape_1}
-  #SBATCH #{mpi_shape_2}
+{% endfor %}  #SBATCH #{mpi_profile_1}
+  #SBATCH #{mpi_profile_2}
   #SBATCH --nodes=#{nodes}
   #SBATCH --ntasks-per-node=#{tasks_per_node}
+  #SBATCH --cpus-per-task=#{cpus_per_task}
   #{walltime_enabled}#{walltime_1}:#{walltime_2}:00
 {% if slurm_job_notifications_enabled | default(false) | bool %}  #SBATCH --mail-type=#{mail_notification_types}
 {% endif %}
 
   export MPI_OPTIONS="#{mpi_bm_hpc}"
   export MPI_OPTIONS="#{mpi_vm}"
+  export MPI_OPTIONS="#{mpi_bm_standard}"
+
+  #{execution_profile_1}
+  #{execution_profile_2}
+  #{execution_profile_3}
 
   #{command}

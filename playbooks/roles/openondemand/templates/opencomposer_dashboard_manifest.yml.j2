@@ -1,9 +1,10 @@
 ---
-name: Open Composer
-category: "03 ジョブ"
+name: Slurmジョブ
+category: "04 OpenComposer"
 description: |
-  Open Composer is an application that creates and submits batch job scripts.
-icon: fas://hat-wizard
-url: {{ ('/pun/sys/' ~ (ood_opencomposer_install_dir | basename) ~ '/slurm') | to_json }}
+  Slurmのバッチジョブスクリプトを作成し、クラスタへ投入します。
+icon: fas://terminal
+url: /pun/sys/dashboard/custom/opencomposer_slurm
+new_window: false
 tile:
   sub_caption: |

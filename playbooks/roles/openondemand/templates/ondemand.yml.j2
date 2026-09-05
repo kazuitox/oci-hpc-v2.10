@@ -9,6 +9,7 @@ pinned_apps:
   - 'sys/activejobs'
   - 'sys/myjobs'
   - 'sys/OpenComposer'
+  - 'sys/OpenComposerHistory'
   - 'sys/system-status'
 {% if ood_dcv_enabled | bool %}
   - 'sys/dcv'
@@ -23,3 +24,17 @@ dashboard_layout:
         - width: 12
           widgets:
             - pinned_apps
+
+custom_pages:
+  opencomposer_slurm:
+    rows:
+      - columns:
+          - width: 12
+            widgets:
+              - opencomposer_slurm
+  opencomposer_history:
+    rows:
+      - columns:
+          - width: 12
+            widgets:
+              - opencomposer_history
