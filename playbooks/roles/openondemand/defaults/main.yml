@@ -31,9 +31,9 @@ ood_dex_static_email: "{{ ood_dex_static_username }}@example.local"
 ood_dex_static_user_id: "{{ ood_dex_static_username }}"
 ood_dex_static_hash: ""
 
-ood_oidc_remote_user_claim: email
+ood_oidc_remote_user_claim: preferred_username
 ood_oidc_ssl_validate_server: "On"
-ood_user_map_match: "^([^@]+)(@.*)?$"
+ood_user_map_match: ".*"
 ood_host_regex: "(compute|desktop|vnc|dcv)-[\\w-]+"
 
 ood_desktop_use_gpu: false
