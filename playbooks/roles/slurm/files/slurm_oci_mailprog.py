@@ -9,6 +9,7 @@ import sys
 import syslog
 import tempfile
 import time
+import unicodedata
 import uuid
 
 
@@ -20,6 +21,8 @@ MAX_PUBLISH_PAYLOAD_BYTES = 60 * 1024
 MAX_QUEUED_MESSAGES = 1200
 MIN_FREE_SPOOL_BYTES = 256 * 1024 * 1024
 TRUNCATION_SUFFIX = "\n\n[message truncated by slurm-oci-mailprog]"
+TABLE_LABEL_WIDTH = 18
+TABLE_VALUE_WIDTH = 52
 SAFE_EVENT = re.compile(r"^[A-Z0-9_*,-]+$")
 EVENT_ALIASES = {
     "BEGAN": "BEGIN",
@@ -122,8 +125,67 @@ def normalize_event(value):
     return normalized if normalized and SAFE_EVENT.match(normalized) else "UNKNOWN"
 
 
-def build_fallback_body(config, environ, username, event, job_id):
-    fields = (
+def display_width(value):
+    width = 0
+    for character in value:
+        if unicodedata.combining(character):
+            continue
+        width += 2 if unicodedata.east_asian_width(character) in ("F", "W") else 1
+    return width
+
+
+def normalize_table_value(value):
+    if value in (None, ""):
+        return "-"
+    characters = []
+    for character in str(value):
+        if character.isspace():
+            characters.append(" ")
+        elif character == "|":
+            characters.append("\\x7c")
+        elif unicodedata.category(character).startswith("C"):
+            characters.append("?")
+        else:
+            characters.append(character)
+    normalized = " ".join("".join(characters).split())
+    return normalized or "-"
+
+
+def limit_table_value(value, maximum_characters=None):
+    value = normalize_table_value(value)
+    if maximum_characters is None or len(value) <= maximum_characters:
+        return value
+    # Prefix-only limiting keeps payload size monotonic for the binary search.
+    return value[:maximum_characters]
+
+
+def split_display_chunks(value, width):
+    chunks = []
+    current = []
+    current_width = 0
+    for character in value:
+        character_width = display_width(character)
+        if current and current_width + character_width > width:
+            chunks.append("".join(current))
+            current = []
+            current_width = 0
+        current.append(character)
+        current_width += character_width
+    if current:
+        chunks.append("".join(current))
+    return chunks or [""]
+
+
+def wrap_table_value(value, width=TABLE_VALUE_WIDTH):
+    return split_display_chunks(value, width)
+
+
+def pad_table_value(value, width):
+    return value + (" " * max(0, width - display_width(value)))
+
+
+def notification_fields(config, environ, username, event, job_id):
+    return (
         ("Cluster", config.get("cluster_name")),
         ("Job ID", job_id),
         ("Job name", environ.get("SLURM_JOB_NAME")),
@@ -132,7 +194,11 @@ def build_fallback_body(config, environ, username, event, job_id):
         ("State", environ.get("SLURM_JOB_STATE")),
         ("Partition", environ.get("SLURM_JOB_PARTITION")),
         ("Nodes", environ.get("SLURM_JOB_NODELIST")),
-        ("Queued time", environ.get("SLURM_JOB_QUEUED_TIME")),
+        (
+            "Queued time",
+            environ.get("SLURM_JOB_QEUEUED_TIME")
+            or environ.get("SLURM_JOB_QUEUED_TIME"),
+        ),
         ("Run time", environ.get("SLURM_JOB_RUN_TIME")),
         ("Exit code", environ.get("SLURM_JOB_EXIT_CODE_MAX")),
         ("Termination signal", environ.get("SLURM_JOB_TERM_SIGNAL_MAX")),
@@ -140,8 +206,104 @@ def build_fallback_body(config, environ, username, event, job_id):
         ("Standard output", environ.get("SLURM_JOB_STDOUT")),
         ("Standard error", environ.get("SLURM_JOB_STDERR")),
     )
-    lines = ["{}: {}".format(label, value) for label, value in fields if value not in (None, "")]
-    return "\n".join(lines) or "Slurm job notification"
+
+
+def build_notification_body(
+    config,
+    environ,
+    username,
+    event,
+    job_id,
+    maximum_value_characters=None,
+):
+    fields = [
+        (label, limit_table_value(value, maximum_value_characters))
+        for label, value in notification_fields(
+            config, environ, username, event, job_id
+        )
+    ]
+    border = "+{}+{}+".format(
+        "-" * (TABLE_LABEL_WIDTH + 2),
+        "-" * (TABLE_VALUE_WIDTH + 2),
+    )
+    lines = [
+        "Slurm Job Notification",
+        "",
+        border,
+        "| {} | {} |".format(
+            pad_table_value("Item", TABLE_LABEL_WIDTH),
+            pad_table_value("Value", TABLE_VALUE_WIDTH),
+        ),
+        border,
+    ]
+    for label, value in fields:
+        wrapped_value = wrap_table_value(value)
+        for index, value_line in enumerate(wrapped_value):
+            label_line = label if index == 0 else ""
+            lines.append(
+                "| {} | {} |".format(
+                    pad_table_value(label_line, TABLE_LABEL_WIDTH),
+                    pad_table_value(value_line, TABLE_VALUE_WIDTH),
+                )
+            )
+    lines.extend(
+        [
+            border,
+            "",
+            'This message was generated automatically by Slurm on cluster "{}".'.format(
+                fields[0][1]
+            ),
+        ]
+    )
+    return "\n".join(lines)
+
+
+def build_notification_body_for_publish(
+    title, config, environ, username, event, job_id
+):
+    body = build_notification_body(config, environ, username, event, job_id)
+    if publish_payload_size(title, body) <= MAX_PUBLISH_PAYLOAD_BYTES:
+        return body
+
+    values = [
+        normalize_table_value(value)
+        for _label, value in notification_fields(
+            config, environ, username, event, job_id
+        )
+    ]
+    low = 1
+    high = max(len(value) for value in values)
+    best = None
+    while low <= high:
+        midpoint = (low + high) // 2
+        candidate = build_notification_body(
+            config,
+            environ,
+            username,
+            event,
+            job_id,
+            maximum_value_characters=midpoint,
+        ) + TRUNCATION_SUFFIX
+        if publish_payload_size(title, candidate) <= MAX_PUBLISH_PAYLOAD_BYTES:
+            best = candidate
+            low = midpoint + 1
+        else:
+            high = midpoint - 1
+
+    if best is not None:
+        return best
+
+    # The table with one-character values is far below the OCI limit. Keep the
+    # generic limiter as a defensive fallback if the surrounding format grows.
+    candidate = build_notification_body(
+        config,
+        environ,
+        username,
+        event,
+        job_id,
+        maximum_value_characters=1,
+    ) + TRUNCATION_SUFFIX
+    return fit_body_to_publish_limit(title, candidate)
 
 
 def queue_message(registry, arguments, environ, spool_path=SPOOL_PATH):
@@ -165,11 +327,14 @@ def queue_message(registry, arguments, environ, spool_path=SPOOL_PATH):
     event = normalize_event(environ.get("SLURM_JOB_MAIL_TYPE", ""))
     job_id = environ.get("SLURM_JOB_ID") or environ.get("SLURM_JOBID", "")
     now = int(time.time())
-    body = read_body()
-    if not body.strip():
-        body = build_fallback_body(config, environ, username, event, job_id)
+    # Drain the mail-compatible input supplied by Slurm. The notification body is
+    # rendered from the documented MailProg environment variables so every event
+    # has the same table layout.
+    read_body()
     title = sanitize_title(extract_subject(arguments), event, job_id)
-    body = fit_body_to_publish_limit(title, body)
+    body = build_notification_body_for_publish(
+        title, config, environ, username, event, job_id
+    )
     message = {
         "version": 1,
         "id": str(uuid.uuid4()),

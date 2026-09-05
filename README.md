@@ -306,6 +306,8 @@ cluster user delete <name>
 
 Slurm の通知処理は OCI CLI を直接待たず、Controller 上のスプールへイベントを保存してから instance principal で OCI Notifications へ配信します。一時的な失敗は systemd timer が再試行し、通知処理の失敗によってジョブの開始・完了処理を失敗させません。OCI の EMAIL 配信制限を超えないよう最大10件/分に抑制し、配信不能ファイルは7日後に自動削除します。
 
+通知メールの本文は、Cluster、Job ID、Job name、User、Event、State、Partition、Nodes、Queued time、Run time、Exit code、Termination signal、Working directory、Standard output、Standard errorを半角罫線の2列表で表示します。取得できない値は `-`、長い値は表の幅に合わせた継続行で表示します。
+
 HA 構成では、LDAP ユーザーの追加・削除時に通知レジストリを backup Controller へ同期します。同期に失敗した場合は不整合を避けるため処理を安全に中断し、復旧後に primary Controller で次のコマンドを実行して再同期できます。
 
 ```bash

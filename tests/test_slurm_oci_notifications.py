@@ -32,11 +32,12 @@ class SlurmOciMailProgTests(unittest.TestCase):
             },
         }
 
-    def test_queues_slurm_subject_body_and_event_for_registered_owner(self):
+    def test_queues_table_body_and_event_for_registered_owner(self):
         environment = {
             "SLURM_JOB_USER": "alice",
             "SLURM_JOB_ID": "42",
             "SLURM_JOB_MAIL_TYPE": "BEGIN",
+            "SLURM_JOB_QUEUED_TIME": "00:00:01",
         }
         with tempfile.TemporaryDirectory() as spool:
             with mock.patch.object(self.module, "read_body", return_value="job body"):
@@ -55,7 +56,20 @@ class SlurmOciMailProgTests(unittest.TestCase):
             self.assertEqual(message["job_id"], "42")
             self.assertEqual(message["mail_type"], "BEGIN")
             self.assertEqual(message["title"], "Slurm Job_id=42 Began")
-            self.assertEqual(message["body"], "job body")
+            self.assertTrue(message["body"].startswith("Slurm Job Notification\n\n+"))
+            self.assertIn(
+                "| Job ID             | 42                                                   |",
+                message["body"],
+            )
+            self.assertIn(
+                "| Event              | BEGIN                                                |",
+                message["body"],
+            )
+            self.assertIn(
+                "| Queued time        | 00:00:01                                             |",
+                message["body"],
+            )
+            self.assertNotIn("job body", message["body"])
             self.assertEqual(message["region"], "ap-tokyo-1")
 
     def test_normalizes_slurm_23_mail_event_and_builds_nonempty_body(self):
@@ -85,9 +99,97 @@ class SlurmOciMailProgTests(unittest.TestCase):
             with open(message_path, encoding="utf-8") as stream:
                 message = json.load(stream)
         self.assertEqual(message["mail_type"], "FAIL")
-        self.assertIn("Cluster: trial", message["body"])
-        self.assertIn("Job name: solver", message["body"])
-        self.assertIn("Exit code: 2", message["body"])
+        self.assertIn(
+            "| Cluster            | trial                                                |",
+            message["body"],
+        )
+        self.assertIn(
+            "| Job name           | solver                                               |",
+            message["body"],
+        )
+        self.assertIn(
+            "| Exit code          | 2                                                    |",
+            message["body"],
+        )
+        self.assertIn(
+            "| Partition          | -                                                    |",
+            message["body"],
+        )
+
+    def test_builds_fixed_width_table_with_existing_fields_in_order(self):
+        environment = {
+            "SLURM_JOB_NAME": "solver",
+            "SLURM_JOB_STATE": "COMPLETED",
+            "SLURM_JOB_PARTITION": "compute",
+            "SLURM_JOB_NODELIST": "compute-[1-2]",
+            "SLURM_JOB_QEUEUED_TIME": "00:00:18",
+            "SLURM_JOB_RUN_TIME": "00:24:37",
+            "SLURM_JOB_EXIT_CODE_MAX": "0",
+            "SLURM_JOB_TERM_SIGNAL_MAX": "",
+            "SLURM_JOB_WORK_DIR": "/work/solver",
+            "SLURM_JOB_STDOUT": "/work/solver/slurm-43.out",
+            "SLURM_JOB_STDERR": "/work/solver/slurm-43.err",
+        }
+        body = self.module.build_notification_body(
+            {"cluster_name": "trial"}, environment, "alice", "END", "43"
+        )
+        expected = """Slurm Job Notification
+
++--------------------+------------------------------------------------------+
+| Item               | Value                                                |
++--------------------+------------------------------------------------------+
+| Cluster            | trial                                                |
+| Job ID             | 43                                                   |
+| Job name           | solver                                               |
+| User               | alice                                                |
+| Event              | END                                                  |
+| State              | COMPLETED                                            |
+| Partition          | compute                                              |
+| Nodes              | compute-[1-2]                                        |
+| Queued time        | 00:00:18                                             |
+| Run time           | 00:24:37                                             |
+| Exit code          | 0                                                    |
+| Termination signal | -                                                    |
+| Working directory  | /work/solver                                         |
+| Standard output    | /work/solver/slurm-43.out                            |
+| Standard error     | /work/solver/slurm-43.err                            |
++--------------------+------------------------------------------------------+
+
+This message was generated automatically by Slurm on cluster "trial"."""
+        self.assertEqual(body, expected)
+        table_lines = [line for line in body.splitlines() if line.startswith(("+", "|"))]
+        self.assertTrue(all(len(line) == 77 for line in table_lines))
+
+    def test_wraps_long_and_unicode_values_without_breaking_table(self):
+        environment = {
+            "SLURM_JOB_NAME": "解析\nジョブ\t|" + ("x" * 48),
+            "SLURM_JOB_WORK_DIR": "y" * 53,
+        }
+        body = self.module.build_notification_body(
+            {"cluster_name": "trial"}, environment, "alice", "BEGIN", "44"
+        )
+        table_lines = [line for line in body.splitlines() if line.startswith(("+", "|"))]
+        self.assertTrue(
+            all(self.module.display_width(line) == 77 for line in table_lines)
+        )
+        self.assertIn("| Job name           | 解析 ジョブ \\x7c", body)
+        self.assertIn("\n|                    | x", body)
+        self.assertNotIn("解析\nジョブ", body)
+        self.assertTrue(
+            all(line.count("|") == 3 for line in table_lines if line.startswith("|"))
+        )
+        self.assertIn(
+            "| Working directory  | {} |".format("y" * 52),
+            body,
+        )
+        self.assertIn(
+            "|                    | y{} |".format(" " * 51),
+            body,
+        )
+        self.assertEqual(
+            self.module.wrap_table_value("界" * 27),
+            [("界" * 26), "界"],
+        )
 
     def test_limits_escaped_body_to_oci_publish_payload_budget(self):
         environment = {
@@ -96,9 +198,8 @@ class SlurmOciMailProgTests(unittest.TestCase):
             "SLURM_JOB_MAIL_TYPE": "Ended",
         }
         with tempfile.TemporaryDirectory() as spool:
-            with mock.patch.object(
-                self.module, "read_body", return_value="\x00" * (60 * 1024)
-            ):
+            environment["SLURM_JOB_STDOUT"] = '\\"解析' * (20 * 1024)
+            with mock.patch.object(self.module, "read_body", return_value="job body"):
                 self.module.queue_message(
                     self.registry,
                     ["-s", "Slurm Job_id=44 Ended"],
@@ -119,6 +220,23 @@ class SlurmOciMailProgTests(unittest.TestCase):
             payload_size, self.module.MAX_PUBLISH_PAYLOAD_BYTES
         )
         self.assertTrue(message["body"].endswith(self.module.TRUNCATION_SUFFIX))
+        self.assertIn(
+            "| Standard error     | -                                                    |",
+            message["body"],
+        )
+        self.assertIn(
+            "+--------------------+------------------------------------------------------+\n\n"
+            'This message was generated automatically by Slurm on cluster "-".',
+            message["body"],
+        )
+        table_lines = [
+            line
+            for line in message["body"].splitlines()
+            if line.startswith(("+", "|"))
+        ]
+        self.assertTrue(
+            all(self.module.display_width(line) == 77 for line in table_lines)
+        )
 
     def test_does_not_queue_for_unregistered_user(self):
         with tempfile.TemporaryDirectory() as spool:
