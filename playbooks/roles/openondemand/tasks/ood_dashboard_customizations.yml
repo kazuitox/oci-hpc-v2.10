@@ -24,6 +24,24 @@
     group: root
     mode: "0644"
 
+- name: OpenOnDemand shell | Ensure application config directory exists
+  ansible.builtin.file:
+    path: /etc/ood/config/apps/shell
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: OpenOnDemand shell | Configure inactivity timeout
+  ansible.builtin.lineinfile:
+    path: /etc/ood/config/apps/shell/env
+    regexp: '^OOD_SHELL_INACTIVE_TIMEOUT_MS='
+    line: "OOD_SHELL_INACTIVE_TIMEOUT_MS={{ ood_shell_inactive_timeout_ms }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: OpenOnDemand dashboard | Ensure system app override directories exist
   ansible.builtin.file:
     path: "/var/www/ood/apps/sys/{{ item }}"
