@@ -12,28 +12,36 @@ module OciHpcSystemStatusPhysicalCores
       nodes = {}
 
       sinfo_output.each_line do |line|
-        fields = line.strip.split("|", 5)
-        next unless fields.length == 5
+        line = line.strip
+        next if line.empty? || line.start_with?("CLUSTER:")
+
+        fields = line.split("|", 5)
+        return unless fields.length == 5
 
         node_name = fields[0].strip
-        next if node_name.empty? || nodes.key?(node_name)
+        return if node_name.empty?
+        next if nodes.key?(node_name)
 
         sockets = positive_integer(fields[1])
         cores_per_socket = positive_integer(fields[2])
-        threads_per_core = positive_integer(fields[3]) || 1
+        threads_per_core = positive_integer(fields[3])
         cpu_state = fields[4].split("/", 4)
-        next unless cpu_state.length == 4
+        return unless cpu_state.length == 4
 
         allocated_threads = non_negative_integer(cpu_state[0])
         total_threads = non_negative_integer(cpu_state[3])
-        next if allocated_threads.nil? || total_threads.nil?
+        return if allocated_threads.nil? || total_threads.nil?
 
         total_cores = if sockets && cores_per_socket
                         sockets * cores_per_socket
-                      else
-                        divide_rounding_up(total_threads, threads_per_core)
                       end
-        next unless total_cores.positive?
+        if threads_per_core.nil? && total_cores && total_threads.positive?
+          threads_per_core = divide_rounding_up(total_threads, total_cores)
+        end
+        return unless threads_per_core
+
+        total_cores ||= divide_rounding_up(total_threads, threads_per_core)
+        return unless total_cores.positive?
 
         # This deployment uses SelectTypeParameters=CR_Core, so Slurm allocates
         # every hardware thread belonging to a selected physical core.
@@ -89,12 +97,16 @@ module OciHpcSystemStatusPhysicalCores
       core_counts = OciHpcSystemStatusPhysicalCores.counts(sinfo_output)
       return original unless core_counts
 
-      original.class.new(
+      physical_core_info = original.class.new(
         original.to_h.merge(
           active_processors: core_counts[:active],
           total_processors: core_counts[:total]
         )
       )
+      physical_core_info.define_singleton_method(:physical_core_counts?) do
+        true
+      end
+      physical_core_info
     rescue StandardError => error
       if defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
         Rails.logger.warn(
@@ -107,7 +119,6 @@ module OciHpcSystemStatusPhysicalCores
       raise
     end
   end
-
 end
 
 Rails.application.config.after_initialize do
@@ -123,16 +134,40 @@ Rails.application.config.after_initialize do
   end
 
   # Redefine this method in place so view classes that included the helper
-  # before after_initialize also receive the new label.
-  original_status_hash = :status_hash_without_physical_core_label
-  unless SystemStatusHelper.method_defined?(original_status_hash)
-    SystemStatusHelper.module_eval do
-      alias_method original_status_hash, :status_hash
-
-      define_method(:status_hash) do |name, active, total|
-        name = "CPU Cores" if name == "Processors"
-        send(original_status_hash, name, active, total)
+  # before after_initialize also receive the new label. Keep the original label
+  # when the topology query failed and get_cluster_info returned Slurm CPU data.
+  SystemStatusHelper.module_eval do
+    define_method(:components_status) do |job_adapter|
+      begin
+        cluster_info = job_adapter.cluster_info
+      rescue NotImplementedError
+        return [not_slurm_hash(job_adapter)]
       end
+
+      processor_name = if cluster_info.respond_to?(:physical_core_counts?) &&
+                          cluster_info.physical_core_counts?
+                         "CPU Cores"
+                       else
+                         "Processors"
+                       end
+
+      [
+        status_hash(
+          "Nodes",
+          cluster_info.active_nodes,
+          cluster_info.total_nodes
+        ),
+        status_hash(
+          processor_name,
+          cluster_info.active_processors,
+          cluster_info.total_processors
+        ),
+        status_hash(
+          "GPUs",
+          cluster_info.active_gpus,
+          cluster_info.total_gpus
+        )
+      ]
     end
   end
 end
