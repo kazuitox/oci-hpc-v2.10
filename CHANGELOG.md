@@ -14,6 +14,7 @@
 
 ### Changed
 
+- 計算ノードのFlex ShapeごとにOCPU数の入力上限を切り替え、E5/E6 Shapeで最大126 OCPUを指定できるようにしました。
 - Slurmジョブ通知メールの本文を、既存項目を維持した固定幅のテキスト表に変更しました。
 - Open OnDemandダッシュボードのOpenComposerリンクから、Slurmジョブ投入フォームを直接開くようにしました。
 - Open OnDemandのAmazon DCV連携とNVIDIA A10 GPUデスクトップを独立したオプションに分離しました。

@@ -1,7 +1,7 @@
 title: HPC クラスタ
 description: Oracle Cloud HPC クラスタ
 schemaVersion: 1.1.0
-version: '2026090301'
+version: '2026090601'
 informationalText: HPC クラスタの自動デプロイ
 logoUrl: https://cloudmarketplace.oracle.com/marketplace/content?contentId=80357668
 source:
@@ -44,7 +44,14 @@ variableGroups:
   - ${cluster_network_shape}
   - ${instance_pool_shape}
   - ${instance_pool_ocpus}
+  - ${instance_pool_ocpus_94}
+  - ${instance_pool_ocpus_76}
+  - ${instance_pool_ocpus_64}
+  - ${instance_pool_ocpus_39}
+  - ${instance_pool_ocpus_32}
+  - ${instance_pool_ocpus_18}
   - ${instance_pool_ocpus_denseIO_flex}
+  - ${instance_pool_ocpus_denseIO_e5_flex}
   - ${instance_pool_custom_memory}
   - ${instance_pool_memory}
 - title: クラスタ設定
@@ -1167,7 +1174,56 @@ variables:
   instance_pool_ocpus:
     title: コア数
     type: integer
-    description: Flex Shape の OCPU 数
+    description: VM.Standard.E5.Flex / VM.Standard.E6.Flex の OCPU 数
+    minimum: 1
+    maximum: 126
+    default: 64
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - or:
+        - eq:
+          - ${instance_pool_shape}
+          - VM.Standard.E5.Flex
+        - eq:
+          - ${instance_pool_shape}
+          - VM.Standard.E6.Flex
+    required: true
+  instance_pool_ocpus_94:
+    title: コア数
+    type: integer
+    description: VM.Standard.E6.Ax.Flex の OCPU 数
+    minimum: 1
+    maximum: 94
+    default: 64
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.Standard.E6.Ax.Flex
+    required: true
+  instance_pool_ocpus_76:
+    title: コア数
+    type: integer
+    description: VM.Standard.A1.Flex の OCPU 数
+    minimum: 1
+    maximum: 76
+    default: 64
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.Standard.A1.Flex
+    required: true
+  instance_pool_ocpus_64:
+    title: コア数
+    type: integer
+    description: VM.Standard.E3.Flex / VM.Standard.E4.Flex の OCPU 数
     minimum: 1
     maximum: 64
     default: 64
@@ -1181,33 +1237,57 @@ variables:
           - VM.Standard.E3.Flex
         - eq:
           - ${instance_pool_shape}
-          - VM.Optimized3.Flex
-        - eq:
-          - ${instance_pool_shape}
           - VM.Standard.E4.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.Standard.E5.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.Standard.E6.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.Standard.E6.Ax.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.Standard.A1.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.Standard3.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.Standard4.Ax.Flex
+    required: true
+  instance_pool_ocpus_39:
+    title: コア数
+    type: integer
+    description: VM.Standard4.Ax.Flex の OCPU 数
+    minimum: 1
+    maximum: 39
+    default: 39
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.Standard4.Ax.Flex
+    required: true
+  instance_pool_ocpus_32:
+    title: コア数
+    type: integer
+    description: VM.Standard3.Flex の OCPU 数
+    minimum: 1
+    maximum: 32
+    default: 32
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.Standard3.Flex
+    required: true
+  instance_pool_ocpus_18:
+    title: コア数
+    type: integer
+    description: VM.Optimized3.Flex の OCPU 数
+    minimum: 1
+    maximum: 18
+    default: 18
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.Optimized3.Flex
     required: true
   instance_pool_ocpus_denseIO_flex:
     title: コア数
     type: enum
-    description: Dense IO Flex Shape の OCPU 数
+    description: VM.DenseIO.E4.Flex の OCPU 数
     enum:
     - 8
     - 16
@@ -1215,13 +1295,31 @@ variables:
     default: 8
     visible:
       and:
-      - or:
-        - eq:
-          - ${instance_pool_shape}
-          - VM.DenseIO.E4.Flex
-        - eq:
-          - ${instance_pool_shape}
-          - VM.DenseIO.E5.Flex
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.DenseIO.E4.Flex
+    required: true
+  instance_pool_ocpus_denseIO_e5_flex:
+    title: コア数
+    type: enum
+    description: VM.DenseIO.E5.Flex の OCPU 数
+    enum:
+    - 8
+    - 16
+    - 24
+    - 32
+    - 40
+    - 48
+    default: 8
+    visible:
+      and:
+      - not:
+        - ${cluster_network}
+      - eq:
+        - ${instance_pool_shape}
+        - VM.DenseIO.E5.Flex
     required: true
   instance_pool_custom_memory:
     title: カスタムメモリサイズを使用
