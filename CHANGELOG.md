@@ -21,6 +21,10 @@
 - Amazon DCVをCPU shapeで利用できるようにし、CPUノードでのGUI導入とGPUノードでのDCV-GL構成をAnsibleで分岐しました。
 - Amazon DCVの検証用途、自動評価ライセンスの有効期間、継続利用時のライセンス責任をUIとドキュメントに明記しました。
 
+### Fixed
+
+- OpenComposerをデプロイ時にPassengerアプリとして事前登録し、Open OnDemand統合画面がJavaScriptエラー時にも白画面にならないようにしました。
+
 ## [v1.0.0] - 2026-08-23
 
 ### Added

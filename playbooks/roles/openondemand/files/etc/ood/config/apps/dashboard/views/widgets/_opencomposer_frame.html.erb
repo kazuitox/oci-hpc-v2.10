@@ -27,7 +27,6 @@
     border: 0;
     height: calc(100vh - 6.5rem);
     min-height: 600px;
-    visibility: hidden;
     width: 100%;
   }
 </style>
@@ -36,7 +35,7 @@
   (() => {
     document.body.classList.add("opencomposer-custom-page");
 
-    const frame = document.getElementById(<%= frame_id.to_json %>);
+    const frame = document.getElementById(<%= raw(frame_id.to_json) %>);
     if (!frame) return;
 
     const prepareFrame = () => {
@@ -46,9 +45,7 @@
         if (openComposerNav) openComposerNav.hidden = true;
       } catch (_error) {
         // The OpenComposer page is expected to be same-origin. If that changes,
-        // leave its navigation intact and still make the page usable.
-      } finally {
-        frame.style.visibility = "visible";
+        // leave its navigation intact and keep the embedded page usable.
       }
     };
 
@@ -62,8 +59,6 @@
       ) {
         prepareFrame();
       }
-    } catch (_error) {
-      frame.style.visibility = "visible";
-    }
+    } catch (_error) {}
   })();
 </script>

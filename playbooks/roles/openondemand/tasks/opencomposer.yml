@@ -91,6 +91,49 @@
     chdir: "{{ ood_opencomposer_install_dir }}"
   changed_when: false
 
+- name: OpenComposer | Inspect the staged system app NGINX configuration
+  ansible.builtin.stat:
+    path: "/var/lib/ondemand-nginx/config/apps/sys/{{ ood_opencomposer_install_dir | basename }}.conf"
+  register: ood_opencomposer_nginx_config_before
+
+- name: OpenComposer | Stage the system app NGINX configuration
+  ansible.builtin.file:
+    path: "/var/lib/ondemand-nginx/config/apps/sys/{{ ood_opencomposer_install_dir | basename }}.conf"
+    state: touch
+    owner: root
+    group: root
+    mode: "0644"
+    access_time: preserve
+    modification_time: preserve
+  register: ood_opencomposer_nginx_config
+
+- name: OpenComposer | Regenerate staged NGINX application configurations
+  ansible.builtin.command:
+    argv:
+      - /opt/ood/nginx_stage/sbin/update_nginx_stage
+      - --quiet
+  changed_when: true
+  when: >-
+    ood_opencomposer_checkout.changed
+    or ood_opencomposer_nginx_config.changed
+    or not (ood_opencomposer_nginx_config_before.stat.exists | default(false))
+    or (ood_opencomposer_nginx_config_before.stat.size | default(0) | int == 0)
+
+- name: OpenComposer | Verify the staged system app NGINX configuration
+  ansible.builtin.stat:
+    path: "/var/lib/ondemand-nginx/config/apps/sys/{{ ood_opencomposer_install_dir | basename }}.conf"
+  register: ood_opencomposer_nginx_config_after
+
+- name: OpenComposer | Require a generated system app NGINX configuration
+  ansible.builtin.assert:
+    that:
+      - ood_opencomposer_nginx_config_after.stat.exists | default(false)
+      - ood_opencomposer_nginx_config_after.stat.isreg | default(false)
+      - ood_opencomposer_nginx_config_after.stat.size | default(0) | int > 0
+    fail_msg: >-
+      OpenComposer's staged NGINX application configuration was not generated.
+      Run /opt/ood/nginx_stage/sbin/update_nginx_stage and inspect its output.
+
 - name: OpenComposer | Request a Passenger restart after managed changes
   ansible.builtin.file:
     path: "{{ ood_opencomposer_install_dir }}/tmp/restart.txt"

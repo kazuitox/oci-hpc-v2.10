@@ -54,6 +54,14 @@ FRAME_WIDGET_PATH = os.path.join(
     "widgets",
     "_opencomposer_frame.html.erb",
 )
+OPENCOMPOSER_TASKS_PATH = os.path.join(
+    REPOSITORY_ROOT,
+    "playbooks",
+    "roles",
+    "openondemand",
+    "tasks",
+    "opencomposer.yml",
+)
 
 
 class OpenComposerDashboardLinkTests(unittest.TestCase):
@@ -69,6 +77,8 @@ class OpenComposerDashboardLinkTests(unittest.TestCase):
             cls.widget_template = template_file.read()
         with open(FRAME_WIDGET_PATH, encoding="utf-8") as frame_widget_file:
             cls.frame_widget = frame_widget_file.read()
+        with open(OPENCOMPOSER_TASKS_PATH, encoding="utf-8") as tasks_file:
+            cls.opencomposer_tasks = tasks_file.read()
 
         environment = jinja2.Environment()
         environment.filters["basename"] = os.path.basename
@@ -164,6 +174,37 @@ class OpenComposerDashboardLinkTests(unittest.TestCase):
         self.assertIn(
             'nonce="<%= content_security_policy_nonce %>"',
             self.frame_widget,
+        )
+
+    def test_frame_id_is_not_html_escaped_inside_javascript(self):
+        self.assertIn(
+            "document.getElementById(<%= raw(frame_id.to_json) %>)",
+            self.frame_widget,
+        )
+
+    def test_frame_remains_visible_when_javascript_fails(self):
+        self.assertNotIn("visibility: hidden", self.frame_widget)
+
+    def test_opencomposer_system_app_is_staged_before_first_user_access(self):
+        config_path = (
+            "/var/lib/ondemand-nginx/config/apps/sys/"
+            "{{ ood_opencomposer_install_dir | basename }}.conf"
+        )
+        self.assertGreaterEqual(
+            self.opencomposer_tasks.count(config_path),
+            2,
+        )
+        self.assertIn(
+            "/opt/ood/nginx_stage/sbin/update_nginx_stage",
+            self.opencomposer_tasks,
+        )
+        self.assertIn(
+            "ood_opencomposer_nginx_config_before.stat.size",
+            self.opencomposer_tasks,
+        )
+        self.assertIn(
+            "ood_opencomposer_nginx_config_after.stat.size",
+            self.opencomposer_tasks,
         )
 
 
