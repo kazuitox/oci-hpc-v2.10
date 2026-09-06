@@ -7,6 +7,7 @@
   loop:
     - ondemand.d
     - locales
+    - apps/dashboard/initializers
     - apps/dashboard/views/widgets
 
 - name: OpenOnDemand dashboard | Render dashboard configuration
@@ -72,6 +73,15 @@
       endpoint: history
   register: ood_opencomposer_endpoint_widgets
 
+- name: OpenOnDemand dashboard | Show physical cores in System Status
+  ansible.builtin.copy:
+    src: etc/ood/config/apps/dashboard/initializers/system_status_physical_cores.rb
+    dest: /etc/ood/config/apps/dashboard/initializers/system_status_physical_cores.rb
+    owner: root
+    group: root
+    mode: "0644"
+  register: ood_system_status_physical_cores
+
 - name: OpenOnDemand dashboard | Request a Passenger restart after widget changes
   ansible.builtin.file:
     path: /var/www/ood/apps/sys/dashboard/tmp/restart.txt
@@ -83,6 +93,7 @@
     ood_dashboard_configuration.changed
     or ood_opencomposer_frame_widget.changed
     or ood_opencomposer_endpoint_widgets.changed
+    or ood_system_status_physical_cores.changed
 
 - name: OpenOnDemand dashboard | Ensure system app override directories exist
   ansible.builtin.file:
