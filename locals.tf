@@ -68,7 +68,20 @@ locals {
 
   shape = var.cluster_network ? var.cluster_network_shape : var.instance_pool_shape
   is_gpu_compute_shape = length(regexall(".*GPU.*", local.shape)) > 0
-  instance_pool_ocpus = ( local.shape == "VM.DenseIO.E4.Flex" || local.shape == "VM.DenseIO.E5.Flex" ) ? var.instance_pool_ocpus_denseIO_flex : var.instance_pool_ocpus
+  instance_pool_flex_ocpus_by_shape = {
+    "VM.Standard.E3.Flex"    = var.instance_pool_ocpus_64
+    "VM.Standard.E4.Flex"    = var.instance_pool_ocpus_64
+    "VM.Standard.E5.Flex"    = var.instance_pool_ocpus
+    "VM.Standard.E6.Flex"    = var.instance_pool_ocpus
+    "VM.Standard.E6.Ax.Flex" = var.instance_pool_ocpus_94
+    "VM.Standard.A1.Flex"    = var.instance_pool_ocpus_76
+    "VM.Standard3.Flex"      = var.instance_pool_ocpus_32
+    "VM.Standard4.Ax.Flex"   = var.instance_pool_ocpus_39
+    "VM.Optimized3.Flex"     = var.instance_pool_ocpus_18
+    "VM.DenseIO.E4.Flex"     = var.instance_pool_ocpus_denseIO_flex
+    "VM.DenseIO.E5.Flex"     = var.instance_pool_ocpus_denseIO_e5_flex
+  }
+  instance_pool_ocpus = lookup(local.instance_pool_flex_ocpus_by_shape, local.shape, var.instance_pool_ocpus)
   controller_ocpus = ( var.controller_shape == "VM.DenseIO.E4.Flex" || var.controller_shape == "VM.DenseIO.E5.Flex" ) ? var.controller_ocpus_denseIO_flex : var.controller_ocpus
   login_ocpus = ( var.login_shape == "VM.DenseIO.E4.Flex" || var.login_shape == "VM.DenseIO.E5.Flex" ) ? var.login_ocpus_denseIO_flex : var.login_ocpus
 // ips of the instances
