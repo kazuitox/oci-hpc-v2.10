@@ -82,7 +82,7 @@
     mode: "0644"
   register: ood_system_status_physical_cores
 
-- name: OpenOnDemand dashboard | Request a Passenger restart after widget changes
+- name: OpenOnDemand dashboard | Request a Passenger restart after dashboard changes
   ansible.builtin.file:
     path: /var/www/ood/apps/sys/dashboard/tmp/restart.txt
     state: touch
